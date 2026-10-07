@@ -2,7 +2,7 @@
 
 A local, evidence-assisted Fast Lane/LUMI-G review application. PDF parsing, lexical retrieval, structured facts, deterministic checks, reviewer confirmations, assessment templates, SQLite audit records and offline evaluation are implemented. The interface works without a model.
 
-**The default is a shadow prototype, not an approved production reviewer.** No historical proposals, existing application, approved internal policy, model weights or deployment hardware were supplied. The bundled 20 cases are explicitly synthetic. No model has been selected or qualified, and no production accuracy claim is made.
+**The default is a shadow prototype, not an approved production reviewer.** Sample proposals, an internal guide and a review template have been supplied and used to refine the workflow. Historical reviewer-labelled decisions, policy sign-off, model weights and deployment hardware remain outstanding. The bundled 20 cases are explicitly synthetic. No model has been selected or qualified, and no production accuracy claim is made.
 
 ## Run
 
@@ -21,7 +21,7 @@ For a non-confidential walkthrough, upload `evaluation/datasets/sample.pdf`, a g
 1. Upload a PDF. Original bytes are processed in memory and not saved.
 2. Verify extracted facts and their page passages. Missing, malformed and contradictory values are distinct from explicit absence.
 3. Inspect each question's evidence, then confirm YES/NO or leave UNKNOWN unresolved. A changed answer or corrected fact requires a note.
-4. Inspect resource calculations and warnings. Explicitly choose the final classification and write a rationale.
+4. Inspect resource calculations and warnings. Explicitly choose acceptance or a rejection category and write a rationale. Acceptance despite blocking guidance also requires an evidence-based exception note.
 5. Download the confirmed assessment. Shadow outputs are visibly marked **not for submission**.
 
 Fact changes and newly added evidence invalidate decision confirmations; any edit invalidates the final export. Re-running inference also clears confirmations. Reviews survive restarts. Unreadable/scanned pages require reviewer transcription and explicit resolution; automatic OCR is not included.
@@ -32,7 +32,7 @@ Previous-allocation sections are excluded from current application fields, inclu
 
 Science, Large Scale and Playground applications support evidence inspection only. Their detected profiles bypass the Fast Lane model and rule engine, and cannot produce a final Fast Lane assessment. A missing current mode also prevents Fast Lane rule execution until verified.
 
-After updating the parser, restart the service and upload the PDF again to create a newly extracted review. Existing saved reviews preserve their original extraction and confirmations; re-running model suggestions does not re-extract their fields.
+After updating the parser or review policy, restart the service and upload the PDF again to create a newly extracted review. Existing saved reviews preserve their original extraction and confirmations; re-running model suggestions does not re-extract their fields.
 
 ## Local models
 
@@ -62,15 +62,17 @@ python -m app.server --reviewer your-id --backend masked \
   --model-path /approved/models/baseline --model-version YOUR_ARTIFACT_SHA256
 ```
 
-The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review runs all four questions. There is no GPU batching scheduler.
+The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven questions, including two manual-only eligibility checks. There is no GPU batching scheduler.
 
 ## Configuration and policy
 
 `app/config/questions.json` contains the versioned registry; `templates.json` contains deterministic wording. `policy.json` contains confidence and retention settings. Pass a reviewed policy with `--policy /approved/policy.json`.
 
-The supplied policy deliberately leaves the storage threshold and GPU accounting units per node unset. Confirm whether GPU hours/concurrency count physical accelerators or GPU compute dies before setting them. The capacity calculation uses exactly the plan's 24 × 30 hour convention and cannot promise scheduler availability.
+The supplied internal guide sets four full MI250X modules per node (two GCDs per module) and a storage warning above 50,000 GB. Storage alone does not trigger rejection. See the [derived review rubric](docs/review-rubric.md) for sources, interpretations and unresolved approval gates. The capacity calculation uses exactly the plan's 24 × 30 hour convention and cannot promise scheduler availability.
 
 Only `FAST_LANE` and `LUMI-G` final assessments are supported. Installation alone is a warning. Independent concurrent jobs are valid scaling. Unconfirmed model negatives are referrals; deterministic impossible capacity can produce a suggested rejection, but **every final classification still needs reviewer confirmation**.
+
+The export follows the template’s three form questions, global comments and classification. Internal checks also cover scaling, official ROCm builds, organisation and country eligibility. Eligibility requires manual verification and a note; the app includes no current country roster. Accepted personal-data projects receive the template’s DPA paragraph and a visible CCR follow-up task. No notifications or enrolments are sent by the app. Previous LUMI use remains optional; installation and startup feasibility must still be reviewed.
 
 Production mode requires `approved: true` and complete thresholds. That configuration gate is an administrator attestation, not evidence that benchmark or organizational approval has occurred. Complete the remaining gates in [implementation status](docs/implementation-status.md) before enabling it.
 

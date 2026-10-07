@@ -1,7 +1,7 @@
 "use strict";
 let token = "", state = null;
 const $ = id => document.getElementById(id);
-const requiredFacts = new Set(["access_mode", "target_machine", "requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months", "total_storage_gb", "personal_data_declared", "vat_number", "previous_lumi_use"]);
+const requiredFacts = new Set(["access_mode", "target_machine", "requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months", "total_storage_gb", "personal_data_declared", "vat_number", "organization_type", "country"]);
 function el(tag, text, cls) { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; }
 function label(text, input) { const e = el("label", text); input.setAttribute("aria-label", text); e.append(input); return e; }
 function input(value = "", type = "text") { const e = el("input"); e.type = type; e.value = value; return e; }
@@ -77,6 +77,7 @@ function render() {
   root.append(el("h2", "2. Review evidence and decisions"));
   for (const [qid, d] of Object.entries(state.decisions)) {
     const card = el("section", undefined, "card"); card.append(el("h3", state.registry.questions[qid].title));
+    if (state.registry.questions[qid].manual_only) card.append(el("p", "Manual verification required. Record the reference or justification in your note.", "banner"));
     card.append(el("p", `Model suggestion: ${d.answer} · ${d.band} · ${d.status}`));
     const noInference = ["MANUAL_REQUIRED", "NO_EVIDENCE_FOUND", "MODEL_ERROR", "UNSUPPORTED_PROFILE"].includes(d.status);
     card.append(el("small", noInference ? "No valid model inference is available. Review the evidence and record your answer." : `${d.model} / ${d.model_version} · top probability ${(d.confidence * 100).toFixed(1)}% · margin ${d.margin.toFixed(2)} · ${d.latency_ms} ms. Scores are advisory and not calibrated accuracy.`));
@@ -95,12 +96,18 @@ function render() {
   all.append(manual); const rerun = el("button", "Re-run suggestions (clears confirmations)", "secondary"); rerun.onclick = () => run(rerun, () => mutate("analyze", {})); all.append(rerun); root.append(all);
   root.append(el("h2", "3. Inspect deterministic checks"));
   const rules = el("div", undefined, "card"); rules.append(el("p", `Suggested classification: ${state.rules.suggested} · ${state.rules.version}`));
-  for (const f of state.rules.findings) { const row = el("div", undefined, "finding"); row.append(el("strong", f.severity), el("span", f.message)); if (Object.keys(f.calculation).length) row.append(el("pre", JSON.stringify(f.calculation, null, 2))); rules.append(row); } root.append(rules);
+  for (const f of state.rules.findings) { const row = el("div", undefined, "finding"); row.append(el("strong", f.severity), el("span", f.message)); if (f.source_ref) row.append(el("p", `Guidance: ${f.source_ref}`, "muted")); if (Object.keys(f.calculation).length) row.append(el("pre", JSON.stringify(f.calculation, null, 2))); rules.append(row); } root.append(rules);
   const final = el("section", undefined, "card"); final.append(el("h2", "4. Confirm the final assessment"));
   final.append(el("p", "All required facts, evidence and decisions must be confirmed. UNKNOWN remains unresolved. You may override the suggested classification with your rationale.", "muted"));
   const f = el("form"), classification = select(["Choose classification", "ACCEPT", "REJECT"], state.final?.classification), rationale = noteBox(), ack = input("", "checkbox"); rationale.maxLength = 4000; rationale.value = state.final?.rationale || ""; ack.checked = Boolean(state.final);
+  const category = select(["NOT_FEASIBLE", "OUT_OF_RESOURCES"], state.final?.rejection_category || "NOT_FEASIBLE"), globalComment = noteBox(), exception = noteBox(); globalComment.maxLength = 4000; exception.maxLength = 4000;
+  globalComment.value = state.final?.global_comment || ""; exception.value = state.final?.exception_note || "";
+  const rejectionDetails = el("select"); rejectionDetails.multiple = true;
+  for (const [value,text] of [["custom_software","Request core dependency details"],["workplan","Request a more detailed workplan"],["resource_capacity","Request amended resource amounts"]]) { const option = el("option",text); option.value = value; option.selected = state.final?.rejection_details?.includes(value) || false; rejectionDetails.append(option); }
   f.append(label("Final classification", classification), label("Classification rationale", rationale)); const check = label("I reviewed all blockers, warnings and unresolved policy findings.", ack); check.className = "check"; f.append(check);
-  submit(f, state.policy.mode === "shadow" ? "Generate confirmed shadow draft" : "Generate confirmed assessment", () => mutate("finalize", { classification: classification.value, rationale: rationale.value, acknowledge_findings: ack.checked })); final.append(f);
+  f.append(label("Rejection category (ineligibility uses NOT_FEASIBLE)", category), label("Additional rejection wording (optional; deselect for acceptance)", rejectionDetails), label("Global technical comments", globalComment), label("Evidence supporting exceptions to blocking guidance (required when accepting despite blockers)", exception));
+  submit(f, state.policy.mode === "shadow" ? "Generate confirmed shadow draft" : "Generate confirmed assessment", () => mutate("finalize", { classification: classification.value, rationale: rationale.value, acknowledge_findings: ack.checked, rejection_category: category.value, rejection_details: selected(rejectionDetails), global_comment: globalComment.value, exception_note: exception.value })); final.append(f);
+  for (const followUp of state.final?.follow_up || []) final.append(el("p", followUp, "banner warning"));
   if (state.final) { final.append(el("pre", state.final.text)); const download = el("button", "Download assessment", "secondary"); download.onclick = () => run(download, async () => { const text = await api(`/api/reviews/${state.id}/export`); saveFile(text, `review-${state.id.slice(0, 8)}.txt`, "text/plain"); }); final.append(download); }
   root.append(final);
   const tools = el("div", undefined, "row"), audit = el("button", "Download audit metadata", "secondary"), remove = el("button", "Delete this review and audit", "danger");

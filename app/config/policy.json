@@ -1,14 +1,50 @@
 {
-  "version": "fast-lane-provisional-1",
+  "version": "fast-lane-internal-guide-1",
   "approved": false,
   "mode": "shadow",
-  "gpu_units_per_node": null,
-  "storage_warning_gb": null,
+  "gpu_units_per_node": 4,
+  "storage_warning_gb": 50000,
   "high_confidence": 0.85,
   "review_band": 0.65,
   "minimum_margin": 0.2,
-  "support_contact": "",
-  "personal_data_wording": "Personal-data processing is declared; the reviewer must verify the applicable data-handling workflow.",
+  "support_contact": "support@lumi-ai-factory.eu",
+  "personal_data_wording": "Personal data declared: notify the CCR. For an accepted project, include the Data Controller / Data Processing Agreement paragraph and complete the CCR follow-up workflow.",
   "review_retention_days": 30,
-  "audit_retention_days": 90
+  "audit_retention_days": 90,
+  "gpu_accounting_unit": "One full MI250X module (two GCDs)",
+  "eligibility_checks": true,
+  "guidance_sources": [
+    {
+      "id": "internal-guide",
+      "title": "Guide to EuroHPC JU AI technical reviews",
+      "sha256": "166226ed701086b4c90280533e3e754bd3b1fd63f2347026408515eba75cd08b",
+      "pages": [
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "id": "review-template",
+      "title": "Default.md",
+      "sha256": "b40fbdb9debda0deb94a240ff5376a0f725c31aef7fa66fa983918197ef6731d"
+    }
+  ],
+  "rule_sources": {
+    "resource_consumption": "internal-guide p.2",
+    "storage": "internal-guide p.2",
+    "multi_node": "internal-guide p.2",
+    "concurrency_units": "internal-guide p.2",
+    "vat": "internal-guide p.3",
+    "organization_eligibility": "internal-guide p.3",
+    "organization_eligible": "internal-guide p.3",
+    "country_eligible": "internal-guide p.3",
+    "official_rocm_builds_available": "internal-guide p.2",
+    "personal_data": "internal-guide p.3; review-template",
+    "code_previously_installed": "internal-guide p.4; review-template",
+    "workplan_sufficient": "internal-guide pp.2,5; review-template",
+    "software_gpu_capable": "internal-guide pp.2,4",
+    "scaling_strategy_adequate": "internal-guide p.2"
+  }
 }

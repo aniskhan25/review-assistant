@@ -2,13 +2,28 @@
   "YES": {
     "software_gpu_capable": "The reviewer confirms a plausible AMD/ROCm execution path for the proposed software.",
     "code_previously_installed": "The reviewer confirms previous installation/use or an available standard environment on LUMI.",
-    "workplan_sufficient": "The reviewer confirms sufficient technical workplan detail.",
+    "workplan_sufficient": "The reviewer confirms that the targets are feasible within the requested allocation and calendar time, allowing for installation, data transfer and preprocessing.",
     "scaling_strategy_adequate": "The reviewer confirms that the execution strategy can use the requested concurrency."
   },
   "NO": {
     "software_gpu_capable": "The reviewer identifies an incompatibility with the target AMD GPU architecture.",
     "code_previously_installed": "Prior LUMI installation is not established; installation work introduces startup risk.",
-    "workplan_sufficient": "The reviewer finds the technical workplan insufficient to assess feasibility.",
+    "workplan_sufficient": "The reviewer finds the workplan insufficient or the targets infeasible within the requested allocation and calendar time.",
     "scaling_strategy_adequate": "The reviewer finds the proposed execution strategy inadequate for the requested concurrency."
-  }
+  },
+  "version": "review-template-1",
+  "form_questions": {
+    "software_gpu_capable": "Are the codes to be used in the project suitable for the architecture of the machine chosen?",
+    "code_previously_installed": "Is the code installed on the machine chosen?",
+    "workplan_sufficient": "Are the targets proposed feasible within the allocation time - Workplan?"
+  },
+  "acceptance": "The project is technically feasible and the stated goals can likely be achieved with the requested resources. You will be automatically enrolled in the EuroHPC JU Federation Platform ( https://my-eurohpc.eu/ ) to manage your project and access LUMI. Please contact us via support@lumi-ai-factory.eu for any assistance during your project.",
+  "personal_data": "Please note for the processing of personal data you will be acting as the Data Controller and need to enter into a Data Processing Agreement with LUMI to ensure that the processing is compliant with the LUMI Terms of Use and applicable law. A representative will contact you via the email address provided in the application. If that does not happen please contact us via support@lumi-ai-factory.eu before you start your processing activities.",
+  "rejection_closing": "If you would like clarification on this assessment or guidance on preparing a revised application, please contact us at support@lumi-ai-factory.eu.",
+  "rejection_details": {
+    "custom_software": "Please amend your application and provide details on the required software libraries that form the core dependencies of your project (e.g. PyTorch/TensorFlow/etc, and any supporting packages (e.g. huggingface transformers or similar)).",
+    "workplan": "The application does not contain sufficient detail on the planned work. Please amend your application and state concrete goals (e.g. number, average duration and size (number of GPUs) of jobs and the amount of parallelization) and how they motivate the requested resources.",
+    "resource_capacity": "Please resubmit and amend or clarify the requested resources: the allocation cannot be consumed within the stated duration even at continuous maximum concurrency."
+  },
+  "storage_warning": "The requested storage exceeds 50,000 GB and will not fit on the default scratch allocation. Please plan to use LUMI-O or request a storage extension."
 }

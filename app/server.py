@@ -173,7 +173,9 @@ def create_server(store, backend, policy, token, reviewer, port=8765):
             elif action == "analyze":
                 analyze(state, backend)
             elif action == "finalize":
-                finalize(state, payload["classification"], payload["rationale"], payload.get("acknowledge_findings"))
+                finalize(state, payload["classification"], payload["rationale"], payload.get("acknowledge_findings"),
+                         payload.get("rejection_category", "NOT_FEASIBLE"), payload.get("global_comment", ""),
+                         payload.get("rejection_details"), payload.get("exception_note", ""))
             else:
                 return self.send(404, {"error": "Unknown action"})
             store.save(state, revision, action)

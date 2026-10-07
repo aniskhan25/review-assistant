@@ -7,7 +7,7 @@ def evaluate(state, policy):
 
     def add(code, severity, message, calculation=None):
         findings.append({"code": code, "severity": severity, "message": message,
-                         "calculation": calculation or {}})
+                         "calculation": calculation or {}, "source_ref": policy.get("rule_sources", {}).get(code)})
 
     def value(key):
         fact = facts[key]
@@ -43,6 +43,14 @@ def evaluate(state, policy):
         add("personal_data", "attention", "Verify the personal-data declaration.")
     if facts["vat_number"]["status"] in {"PARSE_ERROR", "NOT_FOUND", "CONFLICT"}:
         add("vat", "attention", "VAT is unverified; parsing failure is not absence.")
+    elif facts["vat_number"]["status"] == "ABSENT" and policy.get("eligibility_checks"):
+        add("vat", "blocker", "The lead organisation has no verified VAT/tax number; eligibility requires one.")
+    if policy.get("eligibility_checks"):
+        organization = (value("organization_type") or "").strip().lower()
+        if organization in {"university", "research organisation", "research organization", "nonprofit", "non-profit organisation", "non-profit organization"}:
+            add("organization_eligibility", "blocker", "The declared organisation category is ineligible for AI for Industrial Innovation access under the supplied guide.")
+        elif organization in {"large enterprise", "large company"}:
+            add("organization_eligibility", "attention", "Verify open research, including publication of trained models, for the large enterprise.")
     if value("previous_lumi_use") is False:
         add("previous_lumi_use", "warning", "No previous LUMI use is declared; review startup risk.")
     node_units = policy["gpu_units_per_node"]

@@ -78,6 +78,10 @@ class Store:
                                          for key, fact in state["facts"].items()},
                   "final_classification": state["final"]["classification"] if state["final"] else None,
                   "final_rationale": state["final"]["rationale"] if state["final"] else None}
+        if state["final"]:
+            record["rejection_category"] = state["final"].get("rejection_category")
+            record["exception_note"] = state["final"].get("exception_note")
+            record["templates_hash"] = state["final"].get("templates_hash")
         db.execute("INSERT INTO audit(review_id, created, record) VALUES (?, ?, ?)",
                    (state["id"], time.time(), json.dumps(record)))
 

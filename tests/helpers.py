@@ -8,7 +8,7 @@ Application ID: synthetic-001
 Access mode: Fast Lane
 Target machine: LUMI-G
 Project duration (months): 2
-Organization type: University
+Organization type: SME
 Country: Finland
 VAT number: FI12345678
 Resources

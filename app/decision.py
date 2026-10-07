@@ -140,7 +140,7 @@ def decide(backend, question_id, question, evidence, policy, context=""):
     probabilities = {"YES": 0.0, "NO": 0.0, "UNKNOWN": 1.0}
     if not evidence:
         status = "NO_EVIDENCE_FOUND"
-    elif isinstance(backend, ManualBackend):
+    elif isinstance(backend, ManualBackend) or question.get("manual_only"):
         status = "MANUAL_REQUIRED"
     else:
         try:

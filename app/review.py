@@ -14,7 +14,8 @@ from app.retrieval import retrieve
 from app.rules import evaluate
 
 REQUIRED_FACTS = ("access_mode", "target_machine", "requested_gpu_hours", "maximum_number_of_gpus",
-                  "project_duration_months", "total_storage_gb", "personal_data_declared", "vat_number", "previous_lumi_use")
+                  "project_duration_months", "total_storage_gb", "personal_data_declared", "vat_number",
+                  "organization_type", "country")
 
 
 def timestamp():
@@ -87,8 +88,9 @@ def confirm_decision(state, qid, answer, evidence_ids, note):
     note = text_input(note, "reviewer note")
     evidence = find_evidence(state, evidence_ids)
     decision = state["decisions"][qid]
-    if (answer != decision["answer"] or decision["contradiction"]) and not note:
-        raise ValueError("Overrides and contradiction resolution require a note")
+    if (answer != decision["answer"] or decision["contradiction"]
+            or state["registry"]["questions"][qid].get("require_note")) and not note:
+        raise ValueError("Overrides, manual verification and contradiction resolution require a note")
     decision.update({"reviewer_answer": answer, "confirmed": answer != "UNKNOWN",
                      "reviewer_note": note, "reviewer_evidence_ids": [e["id"] for e in evidence],
                      "confirmed_at": timestamp()})
@@ -139,7 +141,8 @@ def add_evidence(state, page, text, note):
     refresh(state)
 
 
-def finalize(state, classification, rationale, acknowledge_findings):
+def finalize(state, classification, rationale, acknowledge_findings, rejection_category="NOT_FEASIBLE",
+             global_comment="", rejection_details=None, exception_note=""):
     if classification not in {"ACCEPT", "REJECT"}:
         raise ValueError("Choose ACCEPT or REJECT explicitly")
     rationale = text_input(rationale, "final rationale", 4000)
@@ -160,29 +163,59 @@ def finalize(state, classification, rationale, acknowledge_findings):
         find_evidence(state, decision["reviewer_evidence_ids"])
     templates = load_config("templates.json")
     rules = evaluate(state, state["policy"])
-    lines = ["SHADOW DRAFT — not for submission" if state["policy"]["mode"] == "shadow" else "Technical assessment",
-             f"Reviewer classification: {classification}", f"Reviewer: {state['reviewer']}",
-             f"Proposal: {state['document']['document_id']}", ""]
-    citations = {}
-    for qid, d in state["decisions"].items():
-        evidence = find_evidence(state, d["reviewer_evidence_ids"])
-        refs = ", ".join(f"{e['id']} (p. {e['page']})" for e in evidence)
-        lines += [state["registry"]["questions"][qid]["title"],
-                  templates[d["reviewer_answer"]][qid] + f" [Evidence: {refs}]", ""]
+    if rejection_category not in {"NOT_FEASIBLE", "OUT_OF_RESOURCES"}:
+        raise ValueError("Choose a valid rejection category")
+    global_comment = text_input(global_comment, "global comment", 4000)
+    exception_note = text_input(exception_note, "exception note", 4000)
+    rejection_details = [] if rejection_details is None else rejection_details
+    if (not isinstance(rejection_details, list) or any(not isinstance(key, str) or key not in templates["rejection_details"] for key in rejection_details)):
+        raise ValueError("Invalid rejection detail")
+    if classification == "ACCEPT" and rejection_details:
+        raise ValueError("Rejection wording is only available for rejected assessments")
+    blockers = [f for f in rules["findings"] if f["severity"] == "blocker"]
+    if classification == "ACCEPT" and blockers and not exception_note:
+        raise ValueError("Explain the evidence supporting an exception to each blocking guideline")
+    if "resource_capacity" in rejection_details and not any(f["code"] == "resource_consumption" for f in blockers):
+        raise ValueError("Capacity rejection wording requires a failed resource-capacity check")
+    eligibility_codes = {"vat", "organization_eligibility", "organization_eligible", "country_eligible"}
+    if classification == "REJECT" and rejection_category != "NOT_FEASIBLE" and any(f["code"] in eligibility_codes for f in blockers):
+        raise ValueError("Eligibility rejections must use the not-feasible category")
+    classification_label = "Accepted" if classification == "ACCEPT" else (
+        "Rejected (not feasible)" if rejection_category == "NOT_FEASIBLE" else "Rejected (out of resources)")
+    lines = ["SHADOW DRAFT — not for submission" if state["policy"]["mode"] == "shadow" else "Technical assessment", ""]
+    citations = {qid: d["reviewer_evidence_ids"] for qid, d in state["decisions"].items()}
+    for qid, title in templates["form_questions"].items():
+        d = state["decisions"][qid]
+        lines += [title, d["reviewer_answer"], templates[d["reviewer_answer"]][qid]]
         if d["reviewer_note"]:
-            lines += ["Reviewer note: " + d["reviewer_note"], ""]
-        citations[qid] = d["reviewer_evidence_ids"]
+            lines.append(d["reviewer_note"])
+        lines.append("")
+    lines.append("Comment globally on the provided technical data and your conclusions:")
+    if global_comment:
+        lines.append(global_comment)
     calculation = next(f["calculation"] for f in rules["findings"] if f["code"] == "resource_consumption")
     lines += [f"At continuous maximum concurrency, the requested allocation requires {calculation['minimum_months']:.3f} 30-day months.",
               "This calculation does not guarantee scheduling availability."]
-    for finding in rules["findings"]:
-        if finding["severity"] in {"warning", "blocker", "attention"}:
-            lines.append(f"{finding['severity'].upper()}: {finding['message']}")
-    lines += ["", "Reviewer classification rationale: " + rationale]
-    if state["policy"]["support_contact"]:
-        lines += ["Support: " + state["policy"]["support_contact"]]
+    if any(f["code"] == "storage" and f["severity"] == "warning" for f in rules["findings"]):
+        lines.append(templates["storage_warning"].replace("50,000", f"{state['policy']['storage_warning_gb']:,.0f}"))
+    lines += ["", "Classification:", classification_label, "", "Reason for classification:", rationale]
+    if exception_note:
+        lines.append("Reviewer justification for guideline exception: " + exception_note)
+    if classification == "ACCEPT":
+        lines.append(templates["acceptance"])
+        if state["facts"]["personal_data_declared"]["value"]:
+            lines.append(templates["personal_data"])
+    else:
+        for key in dict.fromkeys(rejection_details):
+            lines.append(templates["rejection_details"][key])
+        lines.append(templates["rejection_closing"])
     state["rules"] = rules
-    state["final"] = {"classification": classification, "rationale": rationale, "text": "\n".join(lines),
+    state["final"] = {"classification": classification, "classification_label": classification_label,
+                      "rejection_category": rejection_category if classification == "REJECT" else None,
+                      "global_comment": global_comment, "rejection_details": rejection_details,
+                      "exception_note": exception_note, "rationale": rationale, "text": "\n".join(lines),
                       "confirmed_at": timestamp(), "citations": citations, "templates_hash": digest(templates),
+                      "follow_up": ["Notify CCR about accepted personal-data processing; CCR follows the internal DPA workflow."]
+                          if classification == "ACCEPT" and state["facts"]["personal_data_declared"]["value"] else [],
                       "fact_citations": {k: state["facts"][k]["reviewer_evidence_ids"] for k in REQUIRED_FACTS}}
     return state["final"]

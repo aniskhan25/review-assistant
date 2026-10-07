@@ -60,7 +60,8 @@ def test_model_retrieval_excludes_assessment_and_personnel_regions():
     for question in load_config("questions.json")["questions"].values():
         evidence = retrieve(doc["evidence"], question)
         assert evidence
-        assert all(e["scope"] == "proposal" for e in evidence)
+        allowed = {"proposal", "lead"} if question.get("include_lead_evidence") else {"proposal"}
+        assert all(e["scope"] in allowed for e in evidence)
         assert all("reviewer placeholder" not in e["text"] for e in evidence)
 
 
