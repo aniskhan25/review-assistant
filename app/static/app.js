@@ -21,11 +21,11 @@ async function mutate(action, data) {
 function submit(form, text, fn) { const b = el("button", text); form.append(b); form.addEventListener("submit", event => { event.preventDefault(); run(b, fn); }); return b; }
 function evidenceSelect(ids = []) {
   const picker = el("select"); picker.multiple = true; picker.required = true;
-  for (const ev of state.document.evidence) { const o = el("option", `${ev.id} · p. ${ev.page} · ${ev.text.slice(0, 100)}`); o.value = ev.id; o.selected = ids.includes(ev.id); picker.append(o); }
+  for (const ev of state.document.evidence.filter(e => e.scope !== "assessment")) { const o = el("option", `${ev.id} · p. ${ev.page} · ${ev.text.slice(0, 100)}`); o.value = ev.id; o.selected = ids.includes(ev.id); picker.append(o); }
   return picker;
 }
 function selected(picker) { return Array.from(picker.selectedOptions, o => o.value); }
-function evidenceCard(ev) { const box = el("div", undefined, "evidence"); box.append(el("small", `${ev.id} · Page ${ev.page} · ${ev.section}`), el("p", ev.text)); return box; }
+function evidenceCard(ev) { const box = el("div", undefined, "evidence"); box.append(el("small", `${ev.id} · Page ${ev.page} · ${ev.section}${ev.scope === "assessment" ? " · Reviewer form — excluded from proposal evidence" : ""}`), el("p", ev.text)); return box; }
 async function library() {
   const records = await api("/api/reviews"); $("reviews").replaceChildren();
   for (const review of records) { const b = el("button", `${review.finalized ? "✓ " : "○ "}${review.id.slice(0, 8)} · ${new Date(review.created_at).toLocaleDateString()}`, "review-link"); b.onclick = () => run(b, async () => { state = await api(`/api/reviews/${review.id}`); render(); }); $("reviews").append(b); }

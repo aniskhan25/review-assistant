@@ -10,6 +10,7 @@ def tokens(text):
 
 
 def retrieve(evidence, question, limit=5):
+    evidence = [e for e in evidence if e.get("scope") not in {"assessment", "team", "lead"}]
     if not evidence:
         return []
     bags = [Counter(tokens(e["text"])) for e in evidence]

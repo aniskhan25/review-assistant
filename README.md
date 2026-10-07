@@ -26,6 +26,10 @@ For a non-confidential walkthrough, upload `evaluation/datasets/sample.pdf`, a g
 
 Fact changes and newly added evidence invalidate decision confirmations; any edit invalidates the final export. Re-running inference also clears confirmations. Reviews survive restarts. Unreadable/scanned pages require reviewer transcription and explicit resolution; automatic OCR is not included.
 
+The extractor supports consolidated EuroHPC forms, including wrapped labels/values, `AI Factory Selection`, organisation VAT/country, storage/transfer questions and the personal-data declaration. Lead organisation fields are kept separate from team-member organisations, even across page breaks. Appended technical assessment forms cannot supply proposal facts or supporting evidence. Framework/backend fields can identify literal names in the listed software; this does not imply compatibility. Explicit missing markers remain unknown. Previous EuroHPC allocation and previous LUMI use are separate facts.
+
+After updating the parser, restart the service and upload the PDF again to create a newly extracted review. Existing saved reviews preserve their original extraction and confirmations; re-running model suggestions does not re-extract their fields.
+
 ## Local models
 
 The application never downloads weights and includes no hosted inference backend. All adapters normalize a full YES/NO/UNKNOWN probability distribution and apply the same confidence/margin policy. Missing evidence bypasses inference. Invalid responses or model failures return UNKNOWN, leaving manual review usable.

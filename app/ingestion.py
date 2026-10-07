@@ -6,7 +6,34 @@ import re
 
 MAX_BYTES = 20 * 1024 * 1024
 MAX_TEXT = 1_000_000
-EXTRACTOR_VERSION = "embedded-fields-1"
+EXTRACTOR_VERSION = "embedded-fields-2"
+
+
+def form_regions(pages):
+    """Keep party/assessment boundaries across page breaks in consolidated forms."""
+    scope = "proposal"
+    for page in pages:
+        lines = []
+        for line in page["text"].splitlines():
+            heading = line.strip().rstrip(":").lower()
+            next_scope = scope
+            if re.fullmatch(r"technical assessment(?:\s*[-–—].*)?", heading):
+                next_scope = "assessment"
+            elif scope != "assessment":
+                if re.fullmatch(r"project lead and organi[sz]ation information", heading):
+                    next_scope = "lead"
+                elif re.fullmatch(r"team members(?: information|\s*#\d+)", heading):
+                    next_scope = "team"
+                elif heading == "ai factory selection":
+                    next_scope = "proposal"
+            if next_scope != scope:
+                if lines:
+                    yield {"page": page["page"], "text": "\n".join(lines), "scope": scope}
+                lines = []
+                scope = next_scope
+            lines.append(line)
+        if lines:
+            yield {"page": page["page"], "text": "\n".join(lines), "scope": scope}
 
 
 def ingest_pdf(data):
@@ -39,18 +66,24 @@ def document(pages, document_id=None):
         document_id = "sha256:" + hashlib.sha256(body.encode()).hexdigest()
     chunks = []
     section = "Unclassified"
-    headings = re.compile(r"^(?:project summary|ai factory selection|code\(s\) used|"
-                          r"code details.*|description of the code|scalability.*|"
-                          r"work\s?plan|ethics|resources|organization|previous.*)$", re.I)
+    headings = re.compile(r"^(?:project summary(?: \(abstract\))?|ai factory selection|code\(s\) used|"
+                          r"code details(?: and feasibility| #\d+)?|description of the code|scalability and performance|"
+                          r"work\s?plan|ethics(?: self-assessment)?|privacy & data governance|"
+                          r"resources|organi[sz]ation(?: details)?|submission details)$", re.I)
     for page in pages:
         page.setdefault("status", "OK" if len(page["text"].strip()) >= 20 else "PARSE_ERROR")
+    previous_scope = None
+    for page in form_regions(pages):
+        if page["scope"] != previous_scope:
+            section = "Unclassified"
+        previous_scope = page["scope"]
         buffer = ""
 
         def flush():
             nonlocal buffer
             if buffer.strip():
                 chunks.append({"id": f"ev-{len(chunks) + 1}", "page": page["page"],
-                               "section": section, "text": buffer.strip()})
+                               "section": section, "text": buffer.strip(), "scope": page["scope"]})
             buffer = ""
 
         for line in page["text"].splitlines():

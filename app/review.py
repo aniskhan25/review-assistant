@@ -66,6 +66,8 @@ def find_evidence(state, ids):
     index = {e["id"]: e for e in state["document"]["evidence"]}
     if any(not isinstance(key, str) or key not in index for key in ids):
         raise ValueError("Evidence does not belong to this proposal")
+    if any(index[key].get("scope") == "assessment" for key in ids):
+        raise ValueError("Reviewer assessment text cannot serve as proposal evidence")
     return [index[key] for key in dict.fromkeys(ids)]
 
 
