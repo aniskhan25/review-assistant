@@ -14,7 +14,8 @@ def evaluate(state, policy):
         return fact["value"] if fact["status"] == "PRESENT" else None
 
     if value("access_mode") != "FAST_LANE":
-        add("unsupported_profile", "attention", "Only Fast Lane is implemented; verify the access mode.")
+        add("unsupported_profile", "attention", "Fast Lane rules were not applied. This access mode needs its own approved review profile.")
+        return {"version": policy["version"], "findings": findings, "suggested": "REVIEW_REQUIRED"}
     if value("target_machine") is None or value("target_machine").upper() not in {"LUMI-G", "LUMI G"}:
         add("target_machine", "attention", "Verify that the target is LUMI-G.")
     if not policy["approved"]:

@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.configuration import load_config
-from app.decision import ANSWERS, decide
+from app.decision import ANSWERS, decide, ManualBackend
 from app.extraction import FIELDS, extract_facts, parse_value
 from app.retrieval import retrieve
 from app.rules import evaluate
@@ -36,12 +36,16 @@ def new_review(doc, backend, policy, reviewer):
 
 
 def analyze(state, backend):
+    mode = state["facts"]["access_mode"]["value"]
+    unsupported = mode is not None and mode != "FAST_LANE"
     confirmed_facts = {key: {"value": fact["value"], "evidence_ids": fact.get("reviewer_evidence_ids", [])}
                        for key, fact in state["facts"].items() if fact["confirmed"]}
     context = "Reviewer-verified structured facts:\n" + json.dumps(confirmed_facts) if confirmed_facts else ""
     for qid, question in state["registry"]["questions"].items():
         evidence = retrieve(state["document"]["evidence"], question)
-        decision = decide(backend, qid, question, evidence, state["policy"], context)
+        decision = decide(ManualBackend() if unsupported else backend, qid, question, evidence, state["policy"], context)
+        if unsupported:
+            decision["status"] = "UNSUPPORTED_PROFILE"
         decision["confirmed_facts_hash"] = digest(confirmed_facts)
         # This flag asks for resolution; it never flips a model answer automatically.
         text = " ".join(e["text"] for e in evidence)

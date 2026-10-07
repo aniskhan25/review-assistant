@@ -48,6 +48,7 @@ function render() {
   const root = $("review"); root.replaceChildren();
   const heading = el("div", undefined, "row"); heading.append(el("h2", `Review ${state.id.slice(0, 8)}`), el("span", `Revision ${state.revision}`, "badge")); root.append(heading);
   root.append(el("small", `Proposal hash: ${state.document.document_id}`));
+  if (state.facts.access_mode.value && state.facts.access_mode.value !== "FAST_LANE") root.append(el("p", `Detected access mode: ${state.facts.access_mode.value}. Evidence inspection is available; Fast Lane model recommendations, rules and final export do not apply.`, "banner warning"));
   const count = Object.values(state.decisions).filter(d => d.confirmed).length;
   root.append(el("p", `${count} / ${Object.keys(state.decisions).length} decisions confirmed`, "muted"));
   if (state.document.warnings.length) {
@@ -57,10 +58,10 @@ function render() {
     const f = el("form"), n = noteBox(); f.append(label("Verification note", n)); submit(f, "Mark extraction checked", () => mutate("resolve-extraction", { note: n.value })); box.append(f); root.append(box);
   }
   const facts = el("details"); facts.open = true; facts.append(el("summary", "1. Verify structured facts"));
-  facts.append(el("p", "Required facts are marked *. Corrections invalidate decision confirmations. Numbers use GPU hours, GPU count, months and GB.", "muted"));
+  facts.append(el("p", "Required facts are marked *. Corrections invalidate decision confirmations. Units follow each field name: GPU hours and node hours are distinct, as are GB, TB and TBh.", "muted"));
   const grid = el("div", undefined, "fact-grid");
   for (const [field, fact] of Object.entries(state.facts)) {
-    if (fact.derived) continue;
+    if (fact.derived || (fact.optional_resource_field && !fact.source && fact.status !== "CONFLICT")) continue;
     const card = el("div", undefined, "card"), form = el("form");
     card.append(el("h3", `${requiredFacts.has(field) ? "* " : ""}${field.replaceAll("_", " ")}`), el("span", fact.confirmed ? "Confirmed" : fact.status, fact.confirmed ? "badge success" : "badge"));
     if (fact.source) card.append(el("p", `p. ${fact.source.page}: ${fact.source.text}`, "muted"));
@@ -77,7 +78,7 @@ function render() {
   for (const [qid, d] of Object.entries(state.decisions)) {
     const card = el("section", undefined, "card"); card.append(el("h3", state.registry.questions[qid].title));
     card.append(el("p", `Model suggestion: ${d.answer} · ${d.band} · ${d.status}`));
-    const noInference = ["MANUAL_REQUIRED", "NO_EVIDENCE_FOUND", "MODEL_ERROR"].includes(d.status);
+    const noInference = ["MANUAL_REQUIRED", "NO_EVIDENCE_FOUND", "MODEL_ERROR", "UNSUPPORTED_PROFILE"].includes(d.status);
     card.append(el("small", noInference ? "No valid model inference is available. Review the evidence and record your answer." : `${d.model} / ${d.model_version} · top probability ${(d.confidence * 100).toFixed(1)}% · margin ${d.margin.toFixed(2)} · ${d.latency_ms} ms. Scores are advisory and not calibrated accuracy.`));
     if (d.contradiction) card.append(el("p", "Possible evidence/decision contradiction. Explain your resolution in the note.", "banner warning"));
     for (const id of d.evidence_ids) { const ev = state.document.evidence.find(e => e.id === id); if (ev) card.append(evidenceCard(ev)); }

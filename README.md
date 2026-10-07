@@ -28,6 +28,10 @@ Fact changes and newly added evidence invalidate decision confirmations; any edi
 
 The extractor supports consolidated EuroHPC forms, including wrapped labels/values, `AI Factory Selection`, organisation VAT/country, storage/transfer questions and the personal-data declaration. Lead organisation fields are kept separate from team-member organisations, even across page breaks. Appended technical assessment forms cannot supply proposal facts or supporting evidence. Framework/backend fields can identify literal names in the listed software; this does not imply compatibility. Explicit missing markers remain unknown. Previous EuroHPC allocation and previous LUMI use are separate facts.
 
+Previous-allocation sections are excluded from current application fields, including access mode and requested resources. The current mode can also be read from the submission's accepted policy paragraph, including paragraphs continuing on the next page; a bare URL or application-ID prefix is insufficient. Partition forms preserve node-hours, per-job GPU counts, simultaneous jobs, storage tiers in TB, storage-hours in TBh, and TB transfers separately. These are never silently converted to total GPU-hours, total concurrency, or GB. Optional partition fields are shown only when present or conflicting. Wrapped software lists are preserved.
+
+Science, Large Scale and Playground applications support evidence inspection only. Their detected profiles bypass the Fast Lane model and rule engine, and cannot produce a final Fast Lane assessment. A missing current mode also prevents Fast Lane rule execution until verified.
+
 After updating the parser, restart the service and upload the PDF again to create a newly extracted review. Existing saved reviews preserve their original extraction and confirmations; re-running model suggestions does not re-extract their fields.
 
 ## Local models

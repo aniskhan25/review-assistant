@@ -6,7 +6,7 @@ import re
 
 MAX_BYTES = 20 * 1024 * 1024
 MAX_TEXT = 1_000_000
-EXTRACTOR_VERSION = "embedded-fields-2"
+EXTRACTOR_VERSION = "embedded-fields-3"
 
 
 def form_regions(pages):
@@ -20,11 +20,15 @@ def form_regions(pages):
             if re.fullmatch(r"technical assessment(?:\s*[-–—].*)?", heading):
                 next_scope = "assessment"
             elif scope != "assessment":
-                if re.fullmatch(r"project lead and organi[sz]ation information", heading):
+                if re.fullmatch(r"project lead and organi[sz]ation information|principal investigator", heading):
                     next_scope = "lead"
-                elif re.fullmatch(r"team members(?: information|\s*#\d+)", heading):
+                elif re.fullmatch(r"team members(?: information|\s*#\d+)|contact person and team members", heading):
                     next_scope = "team"
-                elif heading == "ai factory selection":
+                elif re.fullmatch(r"previous .+ allocations\s*#\d+", heading):
+                    next_scope = "allocation_history"
+                elif heading in {"ai factory selection", "partitions", "code details and feasibility",
+                                  "code details, development and data management", "ethics self-assessment",
+                                  "data consent", "eligibility confirmation and data consent"}:
                     next_scope = "proposal"
             if next_scope != scope:
                 if lines:
@@ -75,7 +79,7 @@ def document(pages, document_id=None):
     previous_scope = None
     for page in form_regions(pages):
         if page["scope"] != previous_scope:
-            section = "Unclassified"
+            section = "Previous allocations" if page["scope"] == "allocation_history" else "Unclassified"
         previous_scope = page["scope"]
         buffer = ""
 
