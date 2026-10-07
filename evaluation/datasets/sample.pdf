@@ -1,0 +1,32 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 820] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 1070 >>
+stream
+BT /F1 10 Tf 40 780 Td 12 TL (Project summary) Tj T* (Application ID: synthetic-001) Tj T* (Access mode: Fast Lane) Tj T* (Target machine: LUMI-G) Tj T* (Project duration \(months\): 2) Tj T* (Organization type: University) Tj T* (Country: Finland) Tj T* (VAT number: FI12345678) Tj T* (Resources) Tj T* (Requested GPU hours: 50000) Tj T* (Maximum number of GPUs: 64) Tj T* (Total storage \(GB\): 1000) Tj T* (Total transfer \(GB\): 200) Tj T* (Personal data declared: No) Tj T* (Previous LUMI use: No) Tj T* (Previous EuroHPC allocation: No) Tj T* (Code details and feasibility) Tj T* (Code\(s\) used: PyTorch) Tj T* (Frameworks: PyTorch) Tj T* (Backend: ROCm) Tj T* (PyTorch supports ROCm; our core code targets AMD GPUs on LUMI-G.) Tj T* (No prior installation on LUMI. Custom environment installation is needed.) Tj T* (Workplan) Tj T* (We will run 50 training experiments, benchmark throughput and use independent concurrent jobs.) Tj T* (Scalability and performance) Tj T* (Independent job arrays use up to 64 GPUs. Each training experiment uses one GPU.) Tj T* ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1433
+%%EOF

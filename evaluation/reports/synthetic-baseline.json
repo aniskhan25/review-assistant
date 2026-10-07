@@ -1,0 +1,272 @@
+{
+  "backend": "manual",
+  "model_version": "1",
+  "split": "heldout",
+  "dataset_kind": "synthetic",
+  "applications": 20,
+  "production_qualified": false,
+  "qualification_note": "Requires approved policy, curated historical labels, held-out validation and shadow deployment.",
+  "overall": {
+    "count": 80,
+    "accuracy": 0.05,
+    "confusion_matrix": {
+      "YES": {
+        "YES": 0,
+        "NO": 0,
+        "UNKNOWN": 55
+      },
+      "NO": {
+        "YES": 0,
+        "NO": 0,
+        "UNKNOWN": 21
+      },
+      "UNKNOWN": {
+        "YES": 0,
+        "NO": 0,
+        "UNKNOWN": 4
+      }
+    },
+    "per_label": {
+      "YES": {
+        "precision": null,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "NO": {
+        "precision": null,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "UNKNOWN": {
+        "precision": 0.05,
+        "recall": 1.0,
+        "f1": 0.09523809523809523
+      }
+    },
+    "unknown_rate": 1.0,
+    "incorrect_unknown_rate": 0.95,
+    "correct_escalation_rate": 0.05,
+    "high_confidence_count": 0,
+    "high_confidence_accuracy": null,
+    "false_negative_rate": 0.0,
+    "false_positive_rate": 0.0,
+    "brier_score": 1.9,
+    "expected_calibration_error": 0.95,
+    "latency_median_ms": 0.001,
+    "latency_p95_ms": 0.002,
+    "model_error_count": 0
+  },
+  "per_question": {
+    "software_gpu_capable": {
+      "count": 20,
+      "accuracy": 0.05,
+      "confusion_matrix": {
+        "YES": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 17
+        },
+        "NO": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 2
+        },
+        "UNKNOWN": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 1
+        }
+      },
+      "per_label": {
+        "YES": {
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "NO": {
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "UNKNOWN": {
+          "precision": 0.05,
+          "recall": 1.0,
+          "f1": 0.09523809523809523
+        }
+      },
+      "unknown_rate": 1.0,
+      "incorrect_unknown_rate": 0.95,
+      "correct_escalation_rate": 0.05,
+      "high_confidence_count": 0,
+      "high_confidence_accuracy": null,
+      "false_negative_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "brier_score": 1.9,
+      "expected_calibration_error": 0.95,
+      "latency_median_ms": 0.001,
+      "latency_p95_ms": 0.005,
+      "model_error_count": 0
+    },
+    "code_previously_installed": {
+      "count": 20,
+      "accuracy": 0.05,
+      "confusion_matrix": {
+        "YES": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 1
+        },
+        "NO": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 18
+        },
+        "UNKNOWN": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 1
+        }
+      },
+      "per_label": {
+        "YES": {
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "NO": {
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "UNKNOWN": {
+          "precision": 0.05,
+          "recall": 1.0,
+          "f1": 0.09523809523809523
+        }
+      },
+      "unknown_rate": 1.0,
+      "incorrect_unknown_rate": 0.95,
+      "correct_escalation_rate": 0.05,
+      "high_confidence_count": 0,
+      "high_confidence_accuracy": null,
+      "false_negative_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "brier_score": 1.9,
+      "expected_calibration_error": 0.95,
+      "latency_median_ms": 0.001,
+      "latency_p95_ms": 0.004,
+      "model_error_count": 0
+    },
+    "workplan_sufficient": {
+      "count": 20,
+      "accuracy": 0.05,
+      "confusion_matrix": {
+        "YES": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 19
+        },
+        "NO": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 0
+        },
+        "UNKNOWN": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 1
+        }
+      },
+      "per_label": {
+        "YES": {
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "NO": {
+          "precision": null,
+          "recall": null,
+          "f1": null
+        },
+        "UNKNOWN": {
+          "precision": 0.05,
+          "recall": 1.0,
+          "f1": 0.09523809523809523
+        }
+      },
+      "unknown_rate": 1.0,
+      "incorrect_unknown_rate": 0.95,
+      "correct_escalation_rate": 0.05,
+      "high_confidence_count": 0,
+      "high_confidence_accuracy": null,
+      "false_negative_rate": 0.0,
+      "false_positive_rate": null,
+      "brier_score": 1.9,
+      "expected_calibration_error": 0.95,
+      "latency_median_ms": 0.001,
+      "latency_p95_ms": 0.003,
+      "model_error_count": 0
+    },
+    "scaling_strategy_adequate": {
+      "count": 20,
+      "accuracy": 0.05,
+      "confusion_matrix": {
+        "YES": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 18
+        },
+        "NO": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 1
+        },
+        "UNKNOWN": {
+          "YES": 0,
+          "NO": 0,
+          "UNKNOWN": 1
+        }
+      },
+      "per_label": {
+        "YES": {
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "NO": {
+          "precision": null,
+          "recall": 0.0,
+          "f1": 0.0
+        },
+        "UNKNOWN": {
+          "precision": 0.05,
+          "recall": 1.0,
+          "f1": 0.09523809523809523
+        }
+      },
+      "unknown_rate": 1.0,
+      "incorrect_unknown_rate": 0.95,
+      "correct_escalation_rate": 0.05,
+      "high_confidence_count": 0,
+      "high_confidence_accuracy": null,
+      "false_negative_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "brier_score": 1.9,
+      "expected_calibration_error": 0.95,
+      "latency_median_ms": 0.001,
+      "latency_p95_ms": 0.001,
+      "model_error_count": 0
+    }
+  },
+  "evidence_questions_evaluated": 20,
+  "fields_evaluated": 60,
+  "evidence_top5_recall": 1,
+  "field_accuracy": 1,
+  "semantic_rejection_proxy_false_rejection_rate": null,
+  "semantic_acceptance_proxy_false_acceptance_rate": null,
+  "peak_runner_rss_bytes": 29933568,
+  "resource_note": "Runner RSS excludes separate model servers and GPU memory; measure those externally.",
+  "status_counts": {
+    "MANUAL_REQUIRED": 80
+  }
+}

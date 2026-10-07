@@ -1,0 +1,14 @@
+{
+  "version": "fast-lane-provisional-1",
+  "approved": false,
+  "mode": "shadow",
+  "gpu_units_per_node": null,
+  "storage_warning_gb": null,
+  "high_confidence": 0.85,
+  "review_band": 0.65,
+  "minimum_margin": 0.2,
+  "support_contact": "",
+  "personal_data_wording": "Personal-data processing is declared; the reviewer must verify the applicable data-handling workflow.",
+  "review_retention_days": 30,
+  "audit_retention_days": 90
+}

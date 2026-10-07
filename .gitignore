@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.egg-info/
+build/
+dist/
+data/
+models/
+wheelhouse/
+.env
+evaluation/private/
+evaluation/reports/*.json
+!evaluation/reports/synthetic-baseline.json
+.DS_Store

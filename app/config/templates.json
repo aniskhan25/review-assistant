@@ -1,0 +1,14 @@
+{
+  "YES": {
+    "software_gpu_capable": "The reviewer confirms a plausible AMD/ROCm execution path for the proposed software.",
+    "code_previously_installed": "The reviewer confirms previous installation/use or an available standard environment on LUMI.",
+    "workplan_sufficient": "The reviewer confirms sufficient technical workplan detail.",
+    "scaling_strategy_adequate": "The reviewer confirms that the execution strategy can use the requested concurrency."
+  },
+  "NO": {
+    "software_gpu_capable": "The reviewer identifies an incompatibility with the target AMD GPU architecture.",
+    "code_previously_installed": "Prior LUMI installation is not established; installation work introduces startup risk.",
+    "workplan_sufficient": "The reviewer finds the technical workplan insufficient to assess feasibility.",
+    "scaling_strategy_adequate": "The reviewer finds the proposed execution strategy inadequate for the requested concurrency."
+  }
+}
