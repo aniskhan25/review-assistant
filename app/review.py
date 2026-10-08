@@ -12,6 +12,7 @@ from app.decision import ANSWERS, decide, ManualBackend
 from app.extraction import FIELDS, extract_facts, parse_value
 from app.retrieval import retrieve
 from app.rules import evaluate
+from app.semantic_checks import assess
 from app.readiness import fact_evidence, fact_ready, decision_ready
 
 REQUIRED_FACTS = ("access_mode", "target_machine", "requested_gpu_hours", "maximum_number_of_gpus",
@@ -48,7 +49,10 @@ def analyze(state, backend):
     context += "\nAutomatically extracted proposal facts (untrusted evidence, not reviewer verified):\n" + json.dumps(extracted_facts)
     for qid, question in state["registry"]["questions"].items():
         evidence = retrieve(state["document"]["evidence"], question)
-        decision = decide(ManualBackend() if unsupported else backend, qid, question, evidence, state["policy"], context)
+        if question.get("checks") and not unsupported and not isinstance(backend, ManualBackend):
+            decision = assess(state, backend, qid, question, context)
+        else:
+            decision = decide(ManualBackend() if unsupported else backend, qid, question, evidence, state["policy"], context)
         if unsupported:
             decision["status"] = "UNSUPPORTED_PROFILE"
         decision["confirmed_facts_hash"] = digest(confirmed_facts)
@@ -227,6 +231,8 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
     for qid, title in templates["form_questions"].items():
         d = decisions[qid]
         lines += [title, d["reviewer_answer"], templates[d["reviewer_answer"]][qid]]
+        if d.get("aggregation_reason"):
+            lines.append("Automated check basis: " + d["aggregation_reason"])
         if d["reviewer_note"]:
             lines.append(d["reviewer_note"])
         lines.append("")

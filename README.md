@@ -12,7 +12,7 @@ The staged Apple Silicon setup starts both the model and review app with:
 python3 -m app.local_jev --reviewer anisrahm --port 8766 --model-port 8018
 ```
 
-Open **http://127.0.0.1:8766**, unlock with `data/reviewer.key`, and upload a PDF. Five technical questions run automatically through Jevos-v4; the two eligibility questions remain manual. See [local Jevos setup](deploy/jev-local.md) for artifact hashes, lifecycle and validation limits.
+Open **http://127.0.0.1:8766**, unlock with `data/reviewer.key`, and upload a PDF. The three submission answers are assembled from narrow evidence checks; scaling and official-build checks also run through Jevos-v4; the two eligibility questions remain manual. See [local Jevos setup](deploy/jev-local.md) for artifact hashes, lifecycle and validation limits.
 
 ## Manual mode and dependencies
 
@@ -72,7 +72,7 @@ python -m app.server --reviewer your-id --backend masked \
   --model-path /approved/models/baseline --model-version YOUR_ARTIFACT_SHA256
 ```
 
-The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven questions, including two manual-only eligibility checks. There is no GPU batching scheduler.
+The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven top-level decisions, including two manual-only eligibility checks. Registry 3.0 runs ten internal checks behind the three submission answers, plus the scaling and official-build questions (twelve model calls total). See [narrow review checks](docs/narrow-review-checks.md). There is no GPU batching scheduler.
 
 ## Configuration and policy
 

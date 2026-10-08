@@ -22,7 +22,7 @@ def decision_ready(state, qid, decision):
     question = state["registry"]["questions"][qid]
     # Negative recommendations remain exceptions, never automatic rejections.
     return (not question.get("manual_only") and not decision.get("contradiction")
-            and decision["status"] == "OK" and decision["answer"] == "YES"
+            and decision["status"] in {"OK", "AGGREGATED"} and decision["answer"] == "YES"
             and decision["confidence"] >= state["policy"]["high_confidence"]
             and decision["margin"] >= state["policy"]["minimum_margin"]
             and bool(decision["evidence_ids"]) and state["extraction_resolved"])

@@ -70,7 +70,7 @@ class Store:
                   "rule_version": state["policy"]["version"],
                   "decisions": {qid: {key: d.get(key) for key in ("model", "model_version", "question_version",
                                 "model_answer", "probabilities", "confidence", "evidence_ids", "reviewer_answer",
-                                "reviewer_evidence_ids", "reviewer_note", "confirmed", "confirmed_facts_hash", "latency_ms")}
+                                "reviewer_evidence_ids", "reviewer_note", "confirmed", "confirmed_facts_hash", "latency_ms", "checks", "aggregation_reason", "aggregation_version")}
                                 for qid, d in state["decisions"].items()},
                   "fact_confirmations": {key: {"confirmed": fact["confirmed"],
                                                "note": fact.get("reviewer_note"),

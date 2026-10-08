@@ -8,7 +8,9 @@ from tests.helpers import TEXT
 
 class PositiveBackend:
     name, version = "test-model", "1"
-    def decide(self, *args):
+    def decide(self, text, question):
+        if question["title"].startswith(("Is a required dependency explicitly CUDA-only", "Does custom or additional application code still")):
+            return {"YES": .02, "NO": .95, "UNKNOWN": .03}
         return {"YES": .95, "NO": .02, "UNKNOWN": .03}
 
 

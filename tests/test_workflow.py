@@ -238,8 +238,8 @@ def test_confirmed_fact_context_is_passed_to_model():
             return super().decide(text, question)
 
     analyze(state, CaptureBackend({"YES": .9, "NO": .05, "UNKNOWN": .05}))
-    assert all(d["status"] == ("MANUAL_REQUIRED" if state["registry"]["questions"][qid].get("manual_only") else "OK")
-               for qid, d in state["decisions"].items())
+    assert all(d["status"] != "MODEL_ERROR" for d in state["decisions"].values())
+    assert all(c["status"] != "MODEL_ERROR" for d in state["decisions"].values() for c in d.get("checks", {}).values())
 
 
 def test_production_configuration_gate(tmp_path):
