@@ -47,6 +47,8 @@ class SystemOneBackend:
     def decide(self, state, question):
         connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=60)
         payload = {"state": state, "questions": {"review": wire_question(question)}}
+        if self.name == "jevos":
+            payload["model"] = "jev-latest"
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = "Bearer " + self.api_key

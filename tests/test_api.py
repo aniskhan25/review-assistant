@@ -109,6 +109,7 @@ def test_systemone_protocol_and_no_redirect():
         def do_POST(self):
             data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             assert data["questions"]["review"]["type"] == "choice"
+            assert data["model"] == "jev-latest"
             if self.redirect:
                 self.send_response(302)
                 self.send_header("Location", "https://example.com")

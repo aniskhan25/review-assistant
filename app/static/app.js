@@ -40,7 +40,7 @@ $("login").addEventListener("submit", event => { event.preventDefault(); run(eve
 $("lock").onclick = () => { token = ""; state = null; $("review").replaceChildren(); $("reviews").replaceChildren(); $("workspace").hidden = true; $("library").hidden = true; $("login").hidden = false; $("welcome").hidden = false; message(""); };
 $("upload").addEventListener("submit", event => { event.preventDefault(); run(event.submitter, async () => {
   const file = $("pdf").files[0]; if (!file || file.size > 20 * 1024 * 1024) throw new Error("Choose a PDF of at most 20 MiB");
-  message("Extracting proposal evidence locally…", "banner");
+  message("Extracting evidence and running configured local review checks…", "banner");
   state = await api("/api/reviews", { method: "POST", headers: { "Content-Type": "application/pdf" }, body: file });
   $("pdf").value = ""; render(); await library(); message("Proposal ready. Confirm the facts before recording decisions.");
 }); });

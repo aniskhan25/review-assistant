@@ -10,7 +10,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from app.configuration import load_policy, load_config
-from app.decision import build_backend, decide, ManualBackend
+from app.decision import build_backend, decide
 from app.ingestion import ingest_pdf, MAX_BYTES
 from app.review import (new_review, analyze, confirm_decision, confirm_fact, add_evidence,
                         finalize, refresh, text_input)
@@ -206,8 +206,7 @@ def main():
     try:
         backend = build_backend(args.backend, args.endpoint, args.model_path, args.model_version)
     except Exception:
-        print("Local backend unavailable. Continuing in manual mode.")
-        backend = ManualBackend()
+        parser.error("Requested backend unavailable. Fix its configuration or explicitly choose --backend manual.")
     key_path = Path(args.data_dir) / "reviewer.key"
     if not key_path.exists():
         key_path.write_text(secrets.token_urlsafe(32))

@@ -2,9 +2,19 @@
 
 A local, evidence-assisted Fast Lane/LUMI-G review application. PDF parsing, lexical retrieval, structured facts, deterministic checks, reviewer confirmations, assessment templates, SQLite audit records and offline evaluation are implemented. The interface works without a model.
 
-**The default is a shadow prototype, not an approved production reviewer.** Sample proposals, an internal guide and a review template have been supplied and used to refine the workflow. Historical reviewer-labelled decisions, policy sign-off, model weights and deployment hardware remain outstanding. The bundled 20 cases are explicitly synthetic. No model has been selected or qualified, and no production accuracy claim is made.
+**The default is a shadow prototype, not an approved production reviewer.** Sample proposals, an internal guide and a review template have been supplied and used to refine the workflow. Historical reviewer-labelled decisions, policy sign-off, model weights and deployment hardware remain outstanding. The bundled 20 cases are explicitly synthetic. Jevos-v4 is staged and operationally tested on this Mac as the initial model candidate; it has not been qualified for production accuracy.
 
-## Run
+## Run with the local Jev model
+
+The staged Apple Silicon setup starts both the model and review app with:
+
+```sh
+python3 -m app.local_jev --reviewer anisrahm --port 8766 --model-port 8018
+```
+
+Open **http://127.0.0.1:8766**, unlock with `data/reviewer.key`, and upload a PDF. Five technical questions run automatically through Jevos-v4; the two eligibility questions remain manual. See [local Jevos setup](deploy/jev-local.md) for artifact hashes, lifecycle and validation limits.
+
+## Manual mode and dependencies
 
 Python 3.11 or later is required. Prepare dependencies in a non-confidential staging environment before deploying offline:
 
@@ -36,7 +46,7 @@ After updating the parser or review policy, restart the service and upload the P
 
 ## Local models
 
-The application never downloads weights and includes no hosted inference backend. All adapters normalize a full YES/NO/UNKNOWN probability distribution and apply the same confidence/margin policy. Missing evidence bypasses inference. Invalid responses or model failures return UNKNOWN, leaving manual review usable.
+The review application and local launcher never download weights and includes no hosted inference backend. All adapters normalize a full YES/NO/UNKNOWN probability distribution and apply the same confidence/margin policy. Missing evidence bypasses inference. Invalid responses or model failures return UNKNOWN, leaving manual review usable.
 
 **CPU jevos:** stage its reviewed binary and weights separately, start its local server with an explicit model directory and no state cache, then:
 
@@ -120,4 +130,4 @@ All API requests use `Authorization: Bearer <reviewer key>`. Mutation JSON inclu
 
 ## Adapter references
 
-The adapters were implemented against the public [jevos wire interface](https://github.com/feder-cr/jev) and [OpenJev-4B inference interface](https://github.com/ejhshen/OpenJev/blob/main/docs/INFERENCE.md). The [lookski/OpenJev implementation](https://github.com/lookski/openjev) is another optional SystemOne-compatible candidate; its hosted backends are not used here. Pin and review upstream source, licenses and model artifacts before staging. Protocol tests use local fixtures; actual weight compatibility remains unverified until weights are supplied.
+The adapters were implemented against the public [jevos wire interface](https://github.com/feder-cr/jev) and [OpenJev-4B inference interface](https://github.com/ejhshen/OpenJev/blob/main/docs/INFERENCE.md). The [lookski/OpenJev implementation](https://github.com/lookski/openjev) is another optional SystemOne-compatible candidate; its hosted backends are not used here. Pin and review upstream source, licenses and model artifacts before staging. Protocol tests use local fixtures; Jevos-v4 has now been tested with real staged weights on Apple Silicon. Other adapters remain unverified with real weights.
