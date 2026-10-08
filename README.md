@@ -29,12 +29,12 @@ Open **http://127.0.0.1:8765**. Paste the key from `data/reviewer.key` into the 
 For a non-confidential walkthrough, upload `evaluation/datasets/sample.pdf`, a generated synthetic proposal.
 
 1. Upload a PDF. Original bytes are processed in memory and not saved.
-2. Verify extracted facts and their page passages. Missing, malformed and contradictory values are distinct from explicit absence.
-3. Inspect each question's evidence, then confirm YES/NO or leave UNKNOWN unresolved. A changed answer or corrected fact requires a note.
+2. Resolve highlighted fact gaps. Clear extracted values with matching page evidence are prefilled automatically; missing, malformed and contradictory values remain exceptions. All values stay inspectable and editable.
+3. Resolve decision exceptions. High-confidence positive model answers carry forward automatically. Negative recommendations, uncertain or conflicting answers, model errors and manual eligibility checks need review. A changed answer or corrected fact requires a note.
 4. Inspect resource calculations and warnings. Explicitly choose acceptance or a rejection category and write a rationale. Acceptance despite blocking guidance also requires an evidence-based exception note.
-5. Download the confirmed assessment. Shadow outputs are visibly marked **not for submission**.
+5. Give one final approval covering the draft, its prefilled facts and answers, then download the assessment. Shadow outputs are visibly marked **not for submission**.
 
-Fact changes and newly added evidence invalidate decision confirmations; any edit invalidates the final export. Re-running inference also clears confirmations. Reviews survive restarts. Unreadable/scanned pages require reviewer transcription and explicit resolution; automatic OCR is not included.
+Fact changes and newly added evidence invalidate both automatic answers and decision confirmations; any edit invalidates the final export. Re-running inference also clears confirmations. Reviews survive restarts. Unreadable/scanned pages require reviewer transcription and explicit resolution; automatic OCR is not included.
 
 The extractor supports consolidated EuroHPC forms, including wrapped labels/values, `AI Factory Selection`, organisation VAT/country, storage/transfer questions and the personal-data declaration. Lead organisation fields are kept separate from team-member organisations, even across page breaks. Appended technical assessment forms cannot supply proposal facts or supporting evidence. Framework/backend fields can identify literal names in the listed software; this does not imply compatibility. Explicit missing markers remain unknown. Previous EuroHPC allocation and previous LUMI use are separate facts.
 

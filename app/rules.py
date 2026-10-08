@@ -1,6 +1,8 @@
 """Deterministic Fast Lane checks. Model negatives are referrals until confirmed."""
 
 
+from app.readiness import decision_ready
+
 def evaluate(state, policy):
     findings = []
     facts = state["facts"]
@@ -60,7 +62,7 @@ def evaluate(state, policy):
         add("multi_node", "info", "Concurrency exceeds one node; distributed execution or independent concurrent jobs may satisfy this requirement.")
     for qid, decision in state["decisions"].items():
         answer = decision["reviewer_answer"] if decision["confirmed"] else decision["answer"]
-        if not decision["confirmed"] or answer == "UNKNOWN":
+        if not decision_ready(state, qid, decision):
             add(qid, "attention", "Reviewer confirmation required: " + qid)
         elif answer == "NO":
             add(qid, "warning" if qid == "code_previously_installed" else "blocker",

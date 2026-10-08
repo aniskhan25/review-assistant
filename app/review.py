@@ -12,6 +12,7 @@ from app.decision import ANSWERS, decide, ManualBackend
 from app.extraction import FIELDS, extract_facts, parse_value
 from app.retrieval import retrieve
 from app.rules import evaluate
+from app.readiness import fact_evidence, fact_ready, decision_ready
 
 REQUIRED_FACTS = ("access_mode", "target_machine", "requested_gpu_hours", "maximum_number_of_gpus",
                   "project_duration_months", "total_storage_gb", "personal_data_declared", "vat_number",
@@ -41,7 +42,10 @@ def analyze(state, backend):
     unsupported = mode is not None and mode != "FAST_LANE"
     confirmed_facts = {key: {"value": fact["value"], "evidence_ids": fact.get("reviewer_evidence_ids", [])}
                        for key, fact in state["facts"].items() if fact["confirmed"]}
+    extracted_facts = {key: {"value": fact["value"], "evidence_ids": fact_evidence(state, fact)}
+                       for key, fact in state["facts"].items() if not fact["confirmed"] and fact_ready(state, fact)}
     context = "Reviewer-verified structured facts:\n" + json.dumps(confirmed_facts) if confirmed_facts else ""
+    context += "\nAutomatically extracted proposal facts (untrusted evidence, not reviewer verified):\n" + json.dumps(extracted_facts)
     for qid, question in state["registry"]["questions"].items():
         evidence = retrieve(state["document"]["evidence"], question)
         decision = decide(ManualBackend() if unsupported else backend, qid, question, evidence, state["policy"], context)
@@ -61,8 +65,38 @@ def analyze(state, backend):
 
 
 def refresh(state):
-    state["rules"] = evaluate(state, state["policy"])
     state["final"] = None
+    prepare_review(state)
+
+
+def prepare_review(state):
+    state["rules"] = evaluate(state, state["policy"])
+    for fact in state["facts"].values():
+        fact["ready"] = fact_ready(state, fact)
+    for qid, decision in state["decisions"].items():
+        decision["ready"] = decision_ready(state, qid, decision)
+    state["exceptions"] = {
+        "facts": [key for key in REQUIRED_FACTS if not state["facts"][key]["ready"]],
+        "decisions": [qid for qid, d in state["decisions"].items() if not d["ready"]],
+        "extraction": not state["extraction_resolved"],
+    }
+    templates = load_config("templates.json")
+    state["draft"] = "\n\n".join(
+        title + "\n" + (d["reviewer_answer"] if d["confirmed"] else d["answer"])
+        + ("" if d["ready"] else " — needs review")
+        for qid, title in templates["form_questions"].items()
+        for d in [state["decisions"][qid]])
+
+    state["draft_classification"] = None
+    state["draft_rationale"] = ""
+    if not any(state["exceptions"].values()) and state["facts"]["access_mode"]["value"] == "FAST_LANE" and state["facts"]["target_machine"]["value"].upper() in {"LUMI-G", "LUMI G"}:
+        blockers = [f["message"] for f in evaluate(state, state["policy"])["findings"] if f["severity"] == "blocker"]
+        classification = "REJECT" if blockers else "ACCEPT"
+        rationale = "; ".join(blockers) if blockers else "The reviewed evidence supports technical feasibility within the requested resources and duration."
+        preview = finalize(copy.deepcopy(state), classification, rationale, True)
+        state["draft"] = "PREVIEW — awaiting your final approval\n\n" + preview["text"]
+        state["draft_classification"] = classification
+        state["draft_rationale"] = rationale
 
 
 def find_evidence(state, ids):
@@ -137,7 +171,7 @@ def add_evidence(state, page, text, note):
                      "section": "Reviewer transcription", "text": text, "note": note,
                      "added_by": state["reviewer"]})
     for decision in state["decisions"].values():
-        decision.update({"confirmed": False, "reviewer_answer": None})
+        decision.update({"confirmed": False, "reviewer_answer": None, "status": "STALE_FACTS"})
     refresh(state)
 
 
@@ -148,19 +182,25 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
     rationale = text_input(rationale, "final rationale", 4000)
     if not rationale or acknowledge_findings is not True:
         raise ValueError("Final rationale and acknowledgement of all findings are required")
-    missing = [key for key in REQUIRED_FACTS if not state["facts"][key]["confirmed"]]
+    missing = [key for key in REQUIRED_FACTS if not fact_ready(state, state["facts"][key])]
     if missing:
-        raise ValueError("Confirm required facts: " + ", ".join(missing))
+        raise ValueError("Resolve required facts: " + ", ".join(missing))
     if not state["extraction_resolved"]:
         raise ValueError("Resolve extraction warnings first")
     if state["facts"]["access_mode"]["value"] != "FAST_LANE":
         raise ValueError("Only Fast Lane reviews are supported")
     if state["facts"]["target_machine"]["value"].upper() not in {"LUMI-G", "LUMI G"}:
         raise ValueError("Only the LUMI-G target is supported")
-    if any(not d["confirmed"] or d["reviewer_answer"] == "UNKNOWN" for d in state["decisions"].values()):
-        raise ValueError("Confirm every decision; unresolved answers cannot be exported")
-    for decision in state["decisions"].values():
+    if any(not decision_ready(state, qid, d) for qid, d in state["decisions"].items()):
+        raise ValueError("Resolve decision exceptions; unresolved answers cannot be exported")
+    decisions = copy.deepcopy(state["decisions"])
+    for decision in decisions.values():
+        if not decision["confirmed"]:
+            decision["reviewer_answer"] = decision["answer"]
+            decision["reviewer_evidence_ids"] = decision["evidence_ids"]
         find_evidence(state, decision["reviewer_evidence_ids"])
+    for key in REQUIRED_FACTS:
+        find_evidence(state, fact_evidence(state, state["facts"][key]))
     templates = load_config("templates.json")
     rules = evaluate(state, state["policy"])
     if rejection_category not in {"NOT_FEASIBLE", "OUT_OF_RESOURCES"}:
@@ -183,9 +223,9 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
     classification_label = "Accepted" if classification == "ACCEPT" else (
         "Rejected (not feasible)" if rejection_category == "NOT_FEASIBLE" else "Rejected (out of resources)")
     lines = ["SHADOW DRAFT — not for submission" if state["policy"]["mode"] == "shadow" else "Technical assessment", ""]
-    citations = {qid: d["reviewer_evidence_ids"] for qid, d in state["decisions"].items()}
+    citations = {qid: d["reviewer_evidence_ids"] for qid, d in decisions.items()}
     for qid, title in templates["form_questions"].items():
-        d = state["decisions"][qid]
+        d = decisions[qid]
         lines += [title, d["reviewer_answer"], templates[d["reviewer_answer"]][qid]]
         if d["reviewer_note"]:
             lines.append(d["reviewer_note"])
@@ -217,5 +257,8 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
                       "confirmed_at": timestamp(), "citations": citations, "templates_hash": digest(templates),
                       "follow_up": ["Notify CCR about accepted personal-data processing; CCR follows the internal DPA workflow."]
                           if classification == "ACCEPT" and state["facts"]["personal_data_declared"]["value"] else [],
-                      "fact_citations": {k: state["facts"][k]["reviewer_evidence_ids"] for k in REQUIRED_FACTS}}
+                      "approval_scope": "Final approval includes automatically prefilled facts and model answers",
+                      "automatic_facts": [k for k in REQUIRED_FACTS if not state["facts"][k]["confirmed"]],
+                      "automatic_decisions": [k for k, d in state["decisions"].items() if not d["confirmed"]],
+                      "fact_citations": {k: fact_evidence(state, state["facts"][k]) for k in REQUIRED_FACTS}}
     return state["final"]

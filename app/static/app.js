@@ -42,28 +42,29 @@ $("upload").addEventListener("submit", event => { event.preventDefault(); run(ev
   const file = $("pdf").files[0]; if (!file || file.size > 20 * 1024 * 1024) throw new Error("Choose a PDF of at most 20 MiB");
   message("Extracting evidence and running configured local review checks…", "banner");
   state = await api("/api/reviews", { method: "POST", headers: { "Content-Type": "application/pdf" }, body: file });
-  $("pdf").value = ""; render(); await library(); message("Proposal ready. Confirm the facts before recording decisions.");
+  $("pdf").value = ""; render(); await library(); message("Draft ready. Resolve the highlighted exceptions, then approve the assessment.");
 }); });
 function render() {
   const root = $("review"); root.replaceChildren();
   const heading = el("div", undefined, "row"); heading.append(el("h2", `Review ${state.id.slice(0, 8)}`), el("span", `Revision ${state.revision}`, "badge")); root.append(heading);
   root.append(el("small", `Proposal hash: ${state.document.document_id}`));
   if (state.facts.access_mode.value && state.facts.access_mode.value !== "FAST_LANE") root.append(el("p", `Detected access mode: ${state.facts.access_mode.value}. Evidence inspection is available; Fast Lane model recommendations, rules and final export do not apply.`, "banner warning"));
-  const count = Object.values(state.decisions).filter(d => d.confirmed).length;
-  root.append(el("p", `${count} / ${Object.keys(state.decisions).length} decisions confirmed`, "muted"));
+  const exceptions = state.exceptions || {facts: [], decisions: []};
+  root.append(el("p", `${exceptions.facts.length} fact gaps · ${exceptions.decisions.length} decision exceptions. Clear facts and supported answers are prefilled for final approval.`, "banner"));
   if (state.document.warnings.length) {
     const box = el("div", undefined, "card warning"); box.append(el("h3", "Extraction needs attention"));
     for (const text of state.document.warnings) box.append(el("p", text));
     box.append(el("p", state.extraction_resolved ? "Reviewer marked extraction checked." : "Add manual evidence below for unreadable pages, then record how you checked all gaps."));
     const f = el("form"), n = noteBox(); f.append(label("Verification note", n)); submit(f, "Mark extraction checked", () => mutate("resolve-extraction", { note: n.value })); box.append(f); root.append(box);
   }
-  const facts = el("details"); facts.open = true; facts.append(el("summary", "1. Verify structured facts"));
-  facts.append(el("p", "Required facts are marked *. Corrections invalidate decision confirmations. Units follow each field name: GPU hours and node hours are distinct, as are GB, TB and TBh.", "muted"));
+  const facts = el("details"); facts.open = exceptions.facts.length > 0; facts.append(el("summary", "1. Extracted facts — resolve gaps or inspect prefills"));
+  facts.append(el("p", "Required facts are marked *. Clearly sourced values need no individual confirmation. Corrections invalidate model answers. Units follow each field name: GPU hours and node hours are distinct, as are GB, TB and TBh.", "muted"));
   const grid = el("div", undefined, "fact-grid");
   for (const [field, fact] of Object.entries(state.facts)) {
     if (fact.derived || (fact.optional_resource_field && !fact.source && fact.status !== "CONFLICT")) continue;
-    const card = el("div", undefined, "card"), form = el("form");
-    card.append(el("h3", `${requiredFacts.has(field) ? "* " : ""}${field.replaceAll("_", " ")}`), el("span", fact.confirmed ? "Confirmed" : fact.status, fact.confirmed ? "badge success" : "badge"));
+    const card = el("details", undefined, "card"), form = el("form"); card.open = requiredFacts.has(field) && !fact.ready;
+    card.append(el("summary", `${field.replaceAll("_", " ")}: ${fact.value ?? "Missing"} · ${fact.confirmed ? "Reviewed" : fact.ready ? "Prefilled" : "Needs review"}`));
+    card.append(el("h3", `${requiredFacts.has(field) ? "* " : ""}${field.replaceAll("_", " ")}`), el("span", fact.confirmed ? "Confirmed" : fact.ready ? "Automatically prefilled" : fact.status, fact.confirmed ? "badge success" : "badge"));
     if (fact.source) card.append(el("p", `p. ${fact.source.page}: ${fact.source.text}`, "muted"));
     if (fact.status === "CONFLICT") for (const c of fact.candidates) card.append(el("p", `p. ${c.source.page}: ${c.source.text}`, "warning"));
     const value = input(typeof fact.value === "boolean" ? (fact.value ? "yes" : "no") : (fact.value ?? ""));
@@ -71,12 +72,12 @@ function render() {
     const sourceIds = fact.reviewer_evidence_ids || state.document.evidence.filter(e => fact.source && e.page === fact.source.page && e.text.includes(fact.source.text)).map(e => e.id);
     const picker = evidenceSelect(sourceIds), note = noteBox(); note.value = fact.reviewer_note || "";
     form.append(label("Verified value", value), label("Status", status), label("Supporting evidence (multiple selection allowed)", picker), label("Note (required for corrections)", note));
-    submit(form, fact.confirmed ? "Update confirmation" : "Confirm fact", () => mutate("fact", { field, value: value.value, status: status.value, evidence_ids: selected(picker), note: note.value })); card.append(form); grid.append(card);
+    submit(form, fact.ready ? "Save correction" : "Resolve fact", () => mutate("fact", { field, value: value.value, status: status.value, evidence_ids: selected(picker), note: note.value })); card.append(form); grid.append(card);
   }
   facts.append(grid); root.append(facts);
-  root.append(el("h2", "2. Review evidence and decisions"));
+  root.append(el("h2", "2. Resolve decision exceptions"));
   for (const [qid, d] of Object.entries(state.decisions)) {
-    const card = el("section", undefined, "card"); card.append(el("h3", state.registry.questions[qid].title));
+    const card = el("details", undefined, "card"); card.open = !d.ready; card.append(el("summary", `${state.registry.questions[qid].title} · ${d.confirmed ? "Reviewed" : d.ready ? "Prefilled" : "Needs review"}`));
     if (state.registry.questions[qid].manual_only) card.append(el("p", "Manual verification required. Record the reference or justification in your note.", "banner"));
     card.append(el("p", `Model suggestion: ${d.answer} · ${d.band} · ${d.status}`));
     const noInference = ["MANUAL_REQUIRED", "NO_EVIDENCE_FOUND", "MODEL_ERROR", "UNSUPPORTED_PROFILE"].includes(d.status);
@@ -98,15 +99,16 @@ function render() {
   const rules = el("div", undefined, "card"); rules.append(el("p", `Suggested classification: ${state.rules.suggested} · ${state.rules.version}`));
   for (const f of state.rules.findings) { const row = el("div", undefined, "finding"); row.append(el("strong", f.severity), el("span", f.message)); if (f.source_ref) row.append(el("p", `Guidance: ${f.source_ref}`, "muted")); if (Object.keys(f.calculation).length) row.append(el("pre", JSON.stringify(f.calculation, null, 2))); rules.append(row); } root.append(rules);
   const final = el("section", undefined, "card"); final.append(el("h2", "4. Confirm the final assessment"));
-  final.append(el("p", "All required facts, evidence and decisions must be confirmed. UNKNOWN remains unresolved. You may override the suggested classification with your rationale.", "muted"));
-  const f = el("form"), classification = select(["Choose classification", "ACCEPT", "REJECT"], state.final?.classification), rationale = noteBox(), ack = input("", "checkbox"); rationale.maxLength = 4000; rationale.value = state.final?.rationale || ""; ack.checked = Boolean(state.final);
+  final.append(el("p", "Review the draft and approve it once. Your approval includes the automatically prefilled facts and answers. Resolve highlighted exceptions first; you can edit any prefill.", "muted"));
+  final.append(el("pre", state.draft || "Resolve exceptions to prepare the draft."));
+  const f = el("form"), classification = select(["Choose classification", "ACCEPT", "REJECT"], state.final?.classification || state.draft_classification), rationale = noteBox(), ack = input("", "checkbox"); rationale.maxLength = 4000; rationale.value = state.final?.rationale || state.draft_rationale || ""; ack.checked = Boolean(state.final);
   const category = select(["NOT_FEASIBLE", "OUT_OF_RESOURCES"], state.final?.rejection_category || "NOT_FEASIBLE"), globalComment = noteBox(), exception = noteBox(); globalComment.maxLength = 4000; exception.maxLength = 4000;
   globalComment.value = state.final?.global_comment || ""; exception.value = state.final?.exception_note || "";
   const rejectionDetails = el("select"); rejectionDetails.multiple = true;
   for (const [value,text] of [["custom_software","Request core dependency details"],["workplan","Request a more detailed workplan"],["resource_capacity","Request amended resource amounts"]]) { const option = el("option",text); option.value = value; option.selected = state.final?.rejection_details?.includes(value) || false; rejectionDetails.append(option); }
-  f.append(label("Final classification", classification), label("Classification rationale", rationale)); const check = label("I reviewed all blockers, warnings and unresolved policy findings.", ack); check.className = "check"; f.append(check);
+  f.append(label("Final classification", classification), label("Classification rationale", rationale)); const check = label("I approve this assessment, including its prefilled facts and answers, and have reviewed the warnings.", ack); check.className = "check"; f.append(check);
   f.append(label("Rejection category (ineligibility uses NOT_FEASIBLE)", category), label("Additional rejection wording (optional; deselect for acceptance)", rejectionDetails), label("Global technical comments", globalComment), label("Evidence supporting exceptions to blocking guidance (required when accepting despite blockers)", exception));
-  submit(f, state.policy.mode === "shadow" ? "Generate confirmed shadow draft" : "Generate confirmed assessment", () => mutate("finalize", { classification: classification.value, rationale: rationale.value, acknowledge_findings: ack.checked, rejection_category: category.value, rejection_details: selected(rejectionDetails), global_comment: globalComment.value, exception_note: exception.value })); final.append(f);
+  submit(f, state.policy.mode === "shadow" ? "Approve shadow assessment" : "Approve assessment", () => mutate("finalize", { classification: classification.value, rationale: rationale.value, acknowledge_findings: ack.checked, rejection_category: category.value, rejection_details: selected(rejectionDetails), global_comment: globalComment.value, exception_note: exception.value })); final.append(f);
   for (const followUp of state.final?.follow_up || []) final.append(el("p", followUp, "banner warning"));
   if (state.final) { final.append(el("pre", state.final.text)); const download = el("button", "Download assessment", "secondary"); download.onclick = () => run(download, async () => { const text = await api(`/api/reviews/${state.id}/export`); saveFile(text, `review-${state.id.slice(0, 8)}.txt`, "text/plain"); }); final.append(download); }
   root.append(final);

@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from app.configuration import load_policy, load_config
 from app.decision import build_backend, decide
 from app.ingestion import ingest_pdf, MAX_BYTES
-from app.review import (new_review, analyze, confirm_decision, confirm_fact, add_evidence,
+from app.review import (prepare_review, new_review, analyze, confirm_decision, confirm_fact, add_evidence,
                         finalize, refresh, text_input)
 from app.security import install_network_guard
 from app.storage import Store, ConflictError
@@ -136,6 +136,7 @@ def create_server(store, backend, policy, token, reviewer, port=8765):
                 return self.send(404, {"error": "Unknown route"})
             review_id = parts[2]
             state = store.get(review_id)
+            prepare_review(state)
             if state["reviewer"] != reviewer:
                 return self.send(403, {"error": "Review belongs to another reviewer"})
             action = parts[3] if len(parts) == 4 else ""

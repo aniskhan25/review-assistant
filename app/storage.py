@@ -81,6 +81,9 @@ class Store:
         if state["final"]:
             record["rejection_category"] = state["final"].get("rejection_category")
             record["exception_note"] = state["final"].get("exception_note")
+            record["automatic_facts"] = state["final"].get("automatic_facts", [])
+            record["automatic_decisions"] = state["final"].get("automatic_decisions", [])
+            record["approval_scope"] = state["final"].get("approval_scope")
             record["templates_hash"] = state["final"].get("templates_hash")
         db.execute("INSERT INTO audit(review_id, created, record) VALUES (?, ?, ?)",
                    (state["id"], time.time(), json.dumps(record)))

@@ -1,6 +1,6 @@
 # Local Jevos on Apple Silicon
 
-The project now has a working Jevos-v4 CPU setup. Jevos is an open-source Jev-style decision model, not the proprietary TypeSafe Jev service. It runs entirely on this Mac after staging. Uploading a PDF runs five bounded technical questions through the model automatically; extraction, arithmetic and template composition remain deterministic. Organisation and country eligibility still require manual verification. Model recommendations and a final assessment require reviewer confirmation.
+The project now has a working Jevos-v4 CPU setup. Jevos is an open-source Jev-style decision model, not the proprietary TypeSafe Jev service. It runs entirely on this Mac after staging. Uploading a PDF runs five bounded technical questions through the model automatically; extraction, arithmetic and template composition remain deterministic. Organisation and country eligibility still require manual verification. The workflow now focuses on exceptions: clear facts and high-confidence positive model answers are prefilled; uncertain or negative answers and eligibility checks require resolution. One final approval covers the draft and automatic prefills.
 
 ## Start
 
