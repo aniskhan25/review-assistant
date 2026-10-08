@@ -91,5 +91,10 @@ def test_gold_review_text_never_enters_model_input():
                   pages=[dict(page=1,text=TEXT)],
                   review_reference={'rationale':'PRIVATE_GOLD_REVIEW'},
                   gold=dict(software_gpu_capable='YES',code_previously_installed='NO',workplan_sufficient='YES'))
-    result = benchmark([record], Backend(), load_policy())
+    completed = []
+    result = benchmark([record], Backend(), load_policy(), on_case=completed.append)
     assert result['applications'] == 1 and not result['classification_evaluated']
+    assert completed == result['cases']
+    assert completed[0]['elapsed_seconds'] >= 0
+    assert completed[0]['answers']['software_gpu_capable']['checks']
+    assert completed[0]['answers']['software_gpu_capable']['aggregation_reason']

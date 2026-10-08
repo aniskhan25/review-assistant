@@ -44,3 +44,5 @@ python -m app.historical_evaluation evaluation/private/RUN/gold-candidates.jsonl
 ```
 
 Supply the model service's authentication through `JEV_API_KEY`, never a command argument. The normal launcher owns an ephemeral key; a separately launched local model with a controlled key is suitable for CLI evaluation. This runner compares the three aggregated submission answers with historical labels, records abstentions and incorrect non-abstaining answers, and refuses cross-split related groups. It does not claim to evaluate final institutional classifications, which may depend on eligibility, exceptions and external verification. Review labels/rationales never enter the model input. Keep the held-out split untouched while tuning on development records.
+
+Each completed proposal is saved to a sibling `.cases.jsonl` file with timing, individual check results and aggregation reasons. The aggregate JSON is written only after completion. Choose a fresh output name for every run; existing results are never overwritten. These diagnostic files contain private proposal evidence and must remain in `evaluation/private/`.
