@@ -158,7 +158,10 @@ def decide(backend, question_id, question, evidence, policy, context=""):
     else:
         try:
             state = "\n\n".join(f"[{e['id']}; page {e['page']}; {e['section']}]\n{e['text']}" for e in evidence)
-            probabilities = backend.decide(context + "\n" + state, question)
+            references = question.get("background_references", [])
+            background = ("Generic framework reference background (not proof of application installation or exact-version compatibility):\n"
+                          + json.dumps(references) + "\n") if references else ""
+            probabilities = backend.decide(background + context + "\n" + state, question)
             validate_probabilities(probabilities)
         except Exception:
             # Provider exceptions may contain full prompts; never expose/log them.
@@ -175,7 +178,7 @@ def decide(backend, question_id, question, evidence, policy, context=""):
     if answer == "UNKNOWN":
         band = "reviewer required"
     return {"question_id": question_id, "question_version": question["version"],
-            "inference_mode": "binary_evidence" if backend.name == "jevos" and question.get("binary_evidence") else "choice",
+            "inference_mode": "binary_evidence" if backend.name in {"jevos", "mlx-option-4b"} and question.get("binary_evidence") else "choice",
             "model_answer": raw_answer, "answer": answer, "probabilities": probabilities,
             "confidence": confidence, "margin": margin, "band": band, "status": status,
             "model": backend.name, "model_version": backend.version,
@@ -191,6 +194,9 @@ def build_backend(kind="manual", endpoint=None, model_path=None, version=None):
         return SystemOneBackend(endpoint or "http://127.0.0.1:8017/v1/systemone", kind, version or "", os.getenv("JEV_API_KEY", ""))
     if kind == "openjev":
         return OpenJevBackend(model_path, version)
+    if kind == "mlx":
+        from app.mlx_backend import MLXBackend
+        return MLXBackend(model_path, version)
     if kind == "masked":
         return MaskedLMBackend(model_path, version)
     raise ValueError("Unsupported backend")

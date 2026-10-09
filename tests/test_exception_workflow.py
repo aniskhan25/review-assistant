@@ -82,3 +82,32 @@ def test_extracted_facts_reach_model_without_being_called_verified():
             assert "Reviewer-verified structured facts" not in text
             return super().decide(text, question)
     new_review(document([{"page": 1, "text": TEXT}]), Capture(), load_policy(), "test")
+
+
+def test_clear_negative_installation_is_a_prefill_not_a_rejection():
+    state = ready_review()
+    decision = state['decisions']['code_previously_installed']
+    decision.update(answer='NO', model_answer='NO', confidence=.95, margin=.9, contradiction=False)
+    prepare_review(state)
+    assert decision['ready']
+    assert not decision['confirmed']
+    assert 'code_previously_installed' not in state['exceptions']['decisions']
+    assert state['draft_classification'] == 'ACCEPT'
+    warning = next(f for f in state['rules']['findings'] if f['code'] == 'code_previously_installed')
+    assert warning['severity'] == 'warning' and 'Reviewer confirmed' not in warning['message']
+    result = finalize(state, 'ACCEPT', state['draft_rationale'], True)
+    assert 'code_previously_installed' in result['automatic_decisions']
+    assert 'NO' in result['text']
+
+
+@pytest.mark.parametrize('change', ['contradiction', 'low', 'unknown'])
+def test_uncertain_negative_installation_remains_an_exception(change):
+    state = ready_review()
+    decision = state['decisions']['code_previously_installed']
+    decision.update(answer='NO', model_answer='NO')
+    if change == 'contradiction': decision['contradiction'] = True
+    if change == 'low': decision['confidence'] = .7
+    if change == 'unknown': decision['answer'] = 'UNKNOWN'
+    prepare_review(state)
+    assert not decision['ready']
+    assert 'code_previously_installed' in state['exceptions']['decisions']

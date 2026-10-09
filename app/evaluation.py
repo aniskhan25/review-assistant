@@ -125,7 +125,7 @@ def main():
     parser.add_argument("dataset")
     parser.add_argument("--output", required=True)
     parser.add_argument("--split", choices=["development", "validation", "heldout"], default="heldout")
-    parser.add_argument("--backend", choices=["manual", "jevos", "systemone", "openjev", "masked"], default="manual")
+    parser.add_argument("--backend", choices=["manual", "jevos", "systemone", "openjev", "masked", "mlx"], default="manual")
     parser.add_argument("--endpoint")
     parser.add_argument("--model-path")
     parser.add_argument("--model-version")

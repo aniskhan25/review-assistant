@@ -65,6 +65,8 @@ python -m app.server --reviewer your-id --backend openjev \
 
 Alternatively, run it in a separately isolated local process and use `--backend systemone --endpoint http://127.0.0.1:8080/v1/systemone`. Literal IPv4 loopback is required; proxies, remote hosts and HTTP redirects are not supported. `JEV_API_KEY` supplies local server authentication when enabled. The model service must itself be isolated; a local address does not prove that a separately installed service stays offline.
 
+**Apple Silicon option scorer:** the staged 4-bit Qwen3 model can use the Mac GPU through MLX. It follows Jev-style option scoring and is not Jevos or the fine-tuned OpenJev model. See [local MLX setup](deploy/mlx-local.md) for the pinned artifact, isolated runtime and offline launcher.
+
 **Masked-logit baseline:** stage a compatible causal model/tokenizer and the optional `masked` dependencies first:
 
 ```sh
@@ -72,7 +74,7 @@ python -m app.server --reviewer your-id --backend masked \
   --model-path /approved/models/baseline --model-version YOUR_ARTIFACT_SHA256
 ```
 
-The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven top-level decisions, including two manual-only eligibility checks. Registry 4.1 runs nine internal checks behind the three submission answers, plus the scaling and official-build questions (eleven model calls total). See [narrow review checks](docs/narrow-review-checks.md). There is no GPU batching scheduler.
+The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven top-level decisions, including two eligibility checks resolved from source-backed rules where possible. Registry 4.2 runs nine internal checks behind the three submission answers, plus scaling/build questions and a prior-use consistency check (up to twelve model calls; literal source claims can bypass calls). See [narrow review checks](docs/narrow-review-checks.md). There is no GPU batching scheduler.
 
 ## Configuration and policy
 
@@ -80,9 +82,9 @@ The baseline loads with `local_files_only=True` and `trust_remote_code=False`, s
 
 The supplied internal guide sets four full MI250X modules per node (two GCDs per module) and a storage warning above 50,000 GB. Storage alone does not trigger rejection. See the [derived review rubric](docs/review-rubric.md) for sources, interpretations and unresolved approval gates. The capacity calculation uses exactly the plan's 24 × 30 hour convention and cannot promise scheduler availability.
 
-Only `FAST_LANE` and `LUMI-G` final assessments are supported. Installation alone is a warning. Independent concurrent jobs are valid scaling. Unconfirmed model negatives are referrals; deterministic impossible capacity can produce a suggested rejection, but **every final classification still needs reviewer confirmation**.
+Only `FAST_LANE` and `LUMI-G` final assessments are supported. Installation alone is a warning. Independent concurrent jobs are valid scaling. Clear high-confidence negative installation answers are prefilled as setup warnings. Other unconfirmed model negatives are referrals; deterministic impossible capacity can produce a suggested rejection, but **every final classification still needs reviewer confirmation**.
 
-The export follows the template’s three form questions, global comments and classification. Internal checks also cover scaling, official ROCm builds, organisation and country eligibility. Eligibility requires manual verification and a note; the app includes no current country roster. Accepted personal-data projects receive the template’s DPA paragraph and a visible CCR follow-up task. No notifications or enrolments are sent by the app. Previous LUMI use remains optional; installation and startup feasibility must still be reviewed.
+The export follows the template’s three form questions, global comments and classification. Internal checks also cover scaling, official ROCm builds, organisation and country eligibility. Clear declared startup/SME/public-sector categories and EU-member countries can be prefilled using the guide and a dated reference subset. Large-enterprise conditions, other countries and uncertain declarations still need manual verification and a note. The EU reference expires on 2027-10-09; it does not cover all affiliated countries. Accepted personal-data projects receive the template’s DPA paragraph and a visible CCR follow-up task. No notifications or enrolments are sent by the app. Previous LUMI use remains optional; installation and startup feasibility must still be reviewed.
 
 Production mode requires `approved: true` and complete thresholds. That configuration gate is an administrator attestation, not evidence that benchmark or organizational approval has occurred. Complete the remaining gates in [implementation status](docs/implementation-status.md) before enabling it.
 
@@ -130,4 +132,4 @@ All API requests use `Authorization: Bearer <reviewer key>`. Mutation JSON inclu
 
 ## Adapter references
 
-The adapters were implemented against the public [jevos wire interface](https://github.com/feder-cr/jev) and [OpenJev-4B inference interface](https://github.com/ejhshen/OpenJev/blob/main/docs/INFERENCE.md). The [lookski/OpenJev implementation](https://github.com/lookski/openjev) is another optional SystemOne-compatible candidate; its hosted backends are not used here. Pin and review upstream source, licenses and model artifacts before staging. Protocol tests use local fixtures; Jevos-v4 has now been tested with real staged weights on Apple Silicon. Other adapters remain unverified with real weights.
+The adapters were implemented against the public [jevos wire interface](https://github.com/feder-cr/jev) and [OpenJev-4B inference interface](https://github.com/ejhshen/OpenJev/blob/main/docs/INFERENCE.md). The [lookski/OpenJev implementation](https://github.com/lookski/openjev) is another optional SystemOne-compatible candidate; its hosted backends are not used here. Pin and review upstream source, licenses and model artifacts before staging. Protocol tests use local fixtures; Jevos-v4 has now been tested with real staged weights on Apple Silicon. The MLX option scorer has been evaluated with real local weights on sixteen development proposals; reports distinguish it from Jevos. Other adapters remain unverified with real weights.

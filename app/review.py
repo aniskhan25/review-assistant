@@ -14,6 +14,7 @@ from app.retrieval import retrieve
 from app.rules import evaluate
 from app.semantic_checks import assess
 from app.readiness import fact_evidence, fact_ready, decision_ready
+from app.eligibility import prefill as eligibility_prefill
 
 REQUIRED_FACTS = ("access_mode", "target_machine", "requested_gpu_hours", "maximum_number_of_gpus",
                   "project_duration_months", "total_storage_gb", "personal_data_declared", "vat_number",
@@ -49,7 +50,9 @@ def analyze(state, backend):
     context += "\nAutomatically extracted proposal facts (untrusted evidence, not reviewer verified):\n" + json.dumps(extracted_facts)
     for qid, question in state["registry"]["questions"].items():
         evidence = retrieve(state["document"]["evidence"], question)
-        if question.get("checks") and not unsupported and not isinstance(backend, ManualBackend):
+        if not unsupported and (question.get("source_category_prefill") or question.get("country_reference")):
+            decision = eligibility_prefill(state, qid, question)
+        elif question.get("checks") and not unsupported and not isinstance(backend, ManualBackend):
             decision = assess(state, backend, qid, question, context)
         else:
             decision = decide(ManualBackend() if unsupported else backend, qid, question, evidence, state["policy"], context)
@@ -263,7 +266,7 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
                       "confirmed_at": timestamp(), "citations": citations, "templates_hash": digest(templates),
                       "follow_up": ["Notify CCR about accepted personal-data processing; CCR follows the internal DPA workflow."]
                           if classification == "ACCEPT" and state["facts"]["personal_data_declared"]["value"] else [],
-                      "approval_scope": "Final approval includes automatically prefilled facts and model answers",
+                      "approval_scope": "Final approval includes automatically prefilled facts and decision answers",
                       "automatic_facts": [k for k in REQUIRED_FACTS if not state["facts"][k]["confirmed"]],
                       "automatic_decisions": [k for k, d in state["decisions"].items() if not d["confirmed"]],
                       "fact_citations": {k: fact_evidence(state, state["facts"][k]) for k in REQUIRED_FACTS}}

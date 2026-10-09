@@ -191,7 +191,7 @@ def main():
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--reviewer", required=True, help="Reviewer identity; use a dedicated OS account/data directory")
     parser.add_argument("--policy")
-    parser.add_argument("--backend", choices=["manual", "jevos", "systemone", "openjev", "masked"], default="manual")
+    parser.add_argument("--backend", choices=["manual", "jevos", "systemone", "openjev", "masked", "mlx"], default="manual")
     parser.add_argument("--endpoint")
     parser.add_argument("--model-path")
     parser.add_argument("--model-version")

@@ -11,6 +11,7 @@ dependencies = ["pdfplumber==0.11.9"]
 
 [project.optional-dependencies]
 test = ["pytest==9.1.0"]
+mlx = ["mlx-lm==0.32.0"]
 masked = ["torch>=2.6", "transformers>=4.51,<6"]
 
 [project.scripts]

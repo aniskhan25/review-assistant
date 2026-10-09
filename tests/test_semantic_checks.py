@@ -109,3 +109,51 @@ def test_architecture_confidence_includes_resolved_compatibility_check():
     state = review()
     answer, _, used = combine('software_gpu_capable', checks(dependencies_identified='YES', amd_path_supported='YES', cuda_only_required='UNKNOWN', compatibility_blocker='NO'), state)
     assert answer == 'YES' and 'compatibility_blocker' in used
+
+
+def test_reference_background_is_not_application_proof():
+    from app.decision import decide
+    class Capture:
+        name, version = 'fixture', '1'
+        def decide(self, text, question):
+            assert 'not proof of application installation or exact-version compatibility' in text
+            assert 'https://docs.example.test/framework' in text
+            return {'YES': .95, 'NO': .03, 'UNKNOWN': .02}
+    state = review()
+    q = dict(state['registry']['questions']['software_gpu_capable'])
+    q['background_references'] = [{'claim': 'Generic framework support', 'url': 'https://docs.example.test/framework'}]
+    result = decide(Capture(), 'software_gpu_capable', q, state['document']['evidence'], state['policy'])
+    assert result['status'] == 'OK'
+    assert result['evidence_ids'] == [e['id'] for e in state['document']['evidence']]
+
+
+def test_registry_42_preserves_full_workplan_aggregation():
+    state = review()
+    state['registry']['version'] = '4.2'
+    assert combine('workplan_sufficient', checks(goals_concrete='YES', jobs_budgeted='UNKNOWN', execution_fits='YES'), state)[0] == 'UNKNOWN'
+
+
+def test_opposite_prior_use_interpretations_remain_unresolved():
+    from app.semantic_checks import resolve_corroboration
+    primary = dict(status='OK', answer='NO', probabilities={'YES': .01, 'NO': .99, 'UNKNOWN': 0}, latency_ms=5, band='high')
+    secondary = dict(status='OK', answer='YES', latency_ms=7)
+    result = resolve_corroboration(primary, secondary)
+    assert result['answer'] == 'UNKNOWN' and result['status'] == 'CHECK_DISAGREEMENT'
+    assert result['probabilities'] == primary['probabilities'] and primary['answer'] == 'NO'
+
+
+def test_registry_42_does_not_override_with_weak_negative_check():
+    state = review();state['registry']['version'] = '4.2'
+    c = checks(compatibility_blocker='YES')
+    c['compatibility_blocker']['confidence'] = .7
+    assert combine('software_gpu_capable', c, state)[0] == 'UNKNOWN'
+    state['registry']['version'] = '4.1'
+    assert combine('software_gpu_capable', c, state)[0] == 'NO'
+
+
+def test_deterministic_capacity_failure_is_not_filtered_by_model_confidence():
+    state = review();state['registry']['version'] = '4.2'
+    state['facts']['requested_gpu_hours']['value'] = 99999999
+    c = checks(goals_concrete='YES', jobs_budgeted='YES', execution_fits='YES')
+    for check in c.values(): check['confidence'] = .7
+    assert combine('workplan_sufficient', c, state)[0] == 'NO'

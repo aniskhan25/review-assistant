@@ -66,7 +66,7 @@ def evaluate(state, policy):
             add(qid, "attention", "Reviewer confirmation required: " + qid)
         elif answer == "NO":
             add(qid, "warning" if qid == "code_previously_installed" else "blocker",
-                "Reviewer confirmed NO: " + qid)
+                ("Reviewer confirmed NO: " if decision["confirmed"] else "Prefilled setup warning (prior use not established): ") + qid)
         if decision.get("contradiction") and not decision["confirmed"]:
             add("contradiction_" + qid, "attention", "Evidence and recommendation conflict; human resolution required.")
     suggested = "REJECT" if any(f["severity"] == "blocker" for f in findings) else (

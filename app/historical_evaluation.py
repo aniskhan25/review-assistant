@@ -64,7 +64,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dataset", type=Path)
     parser.add_argument("--split", choices=["development", "heldout"], default="development")
-    parser.add_argument("--endpoint", required=True)
+    parser.add_argument("--backend", choices=["jevos", "mlx"], default="jevos")
+    parser.add_argument("--endpoint")
+    parser.add_argument("--model-path")
     parser.add_argument("--model-version", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -83,7 +85,7 @@ def main():
         completed += 1
         print(f"Completed {completed}/{total}: {case['application_id']} ({case['elapsed_seconds']}s)", flush=True)
 
-    result = benchmark(records, build_backend("jevos", args.endpoint, version=args.model_version), load_policy(), args.split, save_case)
+    result = benchmark(records, build_backend(args.backend, args.endpoint, args.model_path, args.model_version), load_policy(), args.split, save_case)
     args.output.write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({key: value for key, value in result.items() if key != "cases"}))
 

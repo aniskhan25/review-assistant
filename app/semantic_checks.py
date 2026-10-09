@@ -1,7 +1,10 @@
 """Evidence checks and explicit aggregation for the three submission questions."""
 
+import copy
+
 from app.decision import decide
 from app.retrieval import retrieve
+from app.source_claims import source_claim, claim_decision, claim_evidence
 
 
 def assess(state, backend, qid, question, context):
@@ -9,7 +12,15 @@ def assess(state, backend, qid, question, context):
     for key, specification in question["checks"].items():
         check = dict(question, **specification)
         check.pop("checks", None)
-        checks[key] = decide(backend, key, check, retrieve(state["document"]["evidence"], check), state["policy"], context)
+        evidence = retrieve(state["document"]["evidence"], check)
+        claim = source_claim(check, claim_evidence(check, state["document"]["evidence"], evidence))
+        checks[key] = claim_decision(key, check, claim) if claim else decide(backend, key, check, evidence, state["policy"], context)
+        if check.get("corroborating_question") and checks[key]["answer"] in {"YES", "NO"}:
+            secondary = dict(check, **check["corroborating_question"])
+            secondary.pop("corroborating_question", None)
+            corroboration = decide(backend, key + "-corroboration", secondary,
+                                   retrieve(state["document"]["evidence"], secondary), state["policy"], context)
+            checks[key] = resolve_corroboration(checks[key], corroboration)
         checks[key]["check_title"] = check["title"]
     answer, reason, used = combine(qid, checks, state)
     sources = list(dict.fromkeys(eid for key in used for eid in checks[key]["evidence_ids"]))
@@ -24,14 +35,36 @@ def assess(state, backend, qid, question, context):
             "latency_ms": round(sum(d["latency_ms"] for d in checks.values()), 3),
             "evidence_ids": sources, "reviewer_answer": None, "reviewer_note": "", "confirmed": False,
             "checks": checks, "aggregation_reason": reason,
-            "compatibility_unresolved": (state["registry"]["version"] == "4.1" and qid == "software_gpu_capable"
+            "compatibility_unresolved": (state["registry"]["version"] in {"4.1", "4.2"} and qid == "software_gpu_capable"
                                           and checks["compatibility_blocker"]["answer"] == "UNKNOWN"),
-            "aggregation_version": {"4.1": "3", "4.0": "2"}.get(state["registry"]["version"], "1")}
+            "aggregation_version": {"4.2": "3", "4.1": "3", "4.0": "2"}.get(state["registry"]["version"], "1")}
+
+
+def resolve_corroboration(primary, secondary):
+    result = copy.deepcopy(primary)
+    result["corroboration"] = secondary
+    result["latency_ms"] += secondary.get("latency_ms", 0)
+    if (primary["status"] == secondary["status"] == "OK"
+            and {primary["answer"], secondary["answer"]} == {"YES", "NO"}):
+        result.update(answer="UNKNOWN", status="CHECK_DISAGREEMENT", band="reviewer required")
+    return result
 
 
 def combine(qid, checks, state):
+    answer, reason, used = _combine(qid, checks, state)
+    facts = state["facts"]
+    capacity_failure = (qid == "workplan_sufficient"
+                        and all(facts[key]["status"] == "PRESENT" for key in ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months"))
+                        and facts["requested_gpu_hours"]["value"] > facts["maximum_number_of_gpus"]["value"] * 24 * 30 * facts["project_duration_months"]["value"])
+    if (not capacity_failure and state["registry"]["version"] == "4.2" and answer == "NO" and qid != "code_previously_installed"
+            and any(checks[key].get("confidence", 1) < state["policy"]["high_confidence"] for key in used)):
+        return "UNKNOWN", "The negative evidence check is not strong enough for a reliable combined answer; verify its sources.", used
+    return answer, reason, used
+
+
+def _combine(qid, checks, state):
     # Saved reviews retain their original registry and aggregation semantics.
-    if state["registry"]["version"] not in {"4.0", "4.1"}:
+    if state["registry"]["version"] not in {"4.0", "4.1", "4.2"}:
         return combine_legacy(qid, checks, state)
 
     def is_answer(key, answer):
@@ -40,9 +73,11 @@ def combine(qid, checks, state):
     if qid == "software_gpu_capable":
         if is_answer("compatibility_blocker", "YES"):
             return "NO", "A material software compatibility requirement remains unresolved; review the dependency or version requirement.", ["compatibility_blocker"]
-        if state["registry"]["version"] == "4.1":
+        if state["registry"]["version"] in {"4.1", "4.2"}:
             answer, reason, used = combine_legacy(qid, checks, state)
             if answer == "YES":
+                if state["registry"]["version"] == "4.2" and not is_answer("compatibility_blocker", "NO"):
+                    return "UNKNOWN", "Resolve the material compatibility check before concluding architecture suitability.", list(checks)
                 if is_answer("compatibility_blocker", "NO"):
                     used.append("compatibility_blocker")
                 else:
@@ -70,11 +105,13 @@ def combine(qid, checks, state):
     hours, gpus, months = (facts[key]["value"] for key in keys)
     if hours > gpus * 24 * 30 * months:
         return "NO", "Requested GPU-hours exceed continuous maximum capacity within the project duration.", list(checks)
+    if checks["execution_fits"]["status"] == "ACCOUNTING_ASSUMPTION_REVIEW":
+        return "UNKNOWN", "The budget depends on MFU assumptions and GCD accounting; verify performance measurements and full-MI250X GPU-hour units.", ["execution_fits"]
     for key in ("goals_concrete", "jobs_budgeted", "execution_fits"):
         if is_answer(key, "NO"):
             return "NO", "The workplan has a material evidence gap: " + checks[key].get("check_title", key.replace("_", " ")), [key]
     required = ["goals_concrete", "execution_fits"]
-    if state["registry"]["version"] == "4.1":
+    if state["registry"]["version"] in {"4.1", "4.2"}:
         required.append("jobs_budgeted")
     if all(is_answer(key, "YES") for key in required):
         return "YES", "Concrete targets, workload sizing and the execution assessment support feasibility; capacity arithmetic fits. Separate startup timing is not required.", required

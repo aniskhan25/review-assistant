@@ -78,16 +78,24 @@ function render() {
   root.append(el("h2", "2. Resolve decision exceptions"));
   for (const [qid, d] of Object.entries(state.decisions)) {
     const card = el("details", undefined, "card"); card.open = !d.ready; card.append(el("summary", `${state.registry.questions[qid].title} · ${d.confirmed ? "Reviewed" : d.ready ? "Prefilled" : "Needs review"}`));
-    if (state.registry.questions[qid].manual_only) card.append(el("p", "Manual verification required. Record the reference or justification in your note.", "banner"));
+    if (state.registry.questions[qid].manual_only && !d.ready) card.append(el("p", "Manual verification required. Record the reference or justification in your note.", "banner"));
     card.append(el("p", `${d.checks ? "Combined answer" : "Model suggestion"}: ${d.answer} · ${d.band} · ${d.status}`));
     if (d.checks) {
       card.append(el("p", d.aggregation_reason));
       const checks = el("details"); checks.open = !d.ready; checks.append(el("summary", "Evidence checks behind this answer"));
-      for (const check of Object.values(d.checks)) checks.append(el("p", `${check.check_title}: ${check.answer} · ${check.status} · ${(check.confidence * 100).toFixed(1)}% top score · sources: ${check.evidence_ids.join(", ") || "none"}`));
+      for (const [cid, check] of Object.entries(d.checks)) {
+        checks.append(el("p", `${check.check_title}: ${check.answer} · ${check.status} · ${(check.confidence * 100).toFixed(1)}% top score · sources: ${check.evidence_ids.join(", ") || "none"}`));
+        if (check.source_quotes) checks.append(el("p", `Source-backed claim (not a model probability): ${check.source_quotes.join("; ")}`, "muted"));
+        if (check.corroboration) checks.append(el("p", `Corroborating interpretation: ${check.corroboration.answer} · ${check.corroboration.status}. Opposite resolved answers require review.`, "muted"));
+        for (const reference of state.registry.questions[qid].checks[cid]?.background_references || []) {
+          checks.append(el("p", `Framework reference (checked ${reference.checked}): ${reference.claim} Source: ${reference.url}`, "muted"));
+        }
+      }
       card.append(checks);
     }
     const noInference = ["MANUAL_REQUIRED", "NO_EVIDENCE_FOUND", "MODEL_ERROR", "UNSUPPORTED_PROFILE"].includes(d.status);
-    card.append(el("small", noInference ? "No valid model inference is available. Review the evidence and record your answer." : d.checks ? `${d.model} · combined using explicit rules; minimum supporting check score ${(d.confidence * 100).toFixed(1)}%. This is not a probability of the combined answer.` : `${d.model} / ${d.model_version} · top probability ${(d.confidence * 100).toFixed(1)}% · margin ${d.margin.toFixed(2)} · ${d.latency_ms} ms. Scores are advisory and not calibrated accuracy.`));
+    if (d.inference_mode === "source_rule") card.append(el("p", `${d.reference_reason} Reference: ${d.reference.source || "supplied internal guide"}. This is a rule match, not a model probability.`));
+    else card.append(el("small", noInference ? "No valid model inference is available. Review the evidence and record your answer." : d.checks ? `${d.model} · combined using explicit rules; minimum supporting check score ${(d.confidence * 100).toFixed(1)}%. This is not a probability of the combined answer.` : `${d.model} / ${d.model_version} · top probability ${(d.confidence * 100).toFixed(1)}% · margin ${d.margin.toFixed(2)} · ${d.latency_ms} ms. Scores are advisory and not calibrated accuracy.`));
     if (d.contradiction) card.append(el("p", "Possible evidence/decision contradiction. Explain your resolution in the note.", "banner warning"));
     for (const id of d.evidence_ids) { const ev = state.document.evidence.find(e => e.id === id); if (ev) card.append(evidenceCard(ev)); }
     if (!d.evidence_ids.length) card.append(el("p", "No relevant evidence retrieved. Inspect all passages or add a page transcription.", "warning"));

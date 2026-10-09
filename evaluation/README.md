@@ -35,7 +35,7 @@ Proposed promotion gates: top-5 evidence recall ≥95%, high-confidence accuracy
 
 The private output contains an inventory, source fingerprints, candidate Fast Lane labels, separately retained other profiles, an issue report, and unlabelled narrow-check curation rows for development proposals. Review descriptions remain separate from proposal pages. Overall acceptance never becomes an inferred YES for every technical check. Groups use explicit cross-references and applicant filename matches; split assignments are provisional until related-project checks are complete. Pass all previously inspected/tuned examples via `--exposed` to keep their groups in development. Do not use Git for the generated source data.
 
-For registries 3.0 and 4.1, use the actual aggregation benchmark rather than the legacy broad-question runner:
+For registries 3.0, 4.1 and 4.2, use the actual aggregation benchmark rather than the legacy broad-question runner:
 
 ```sh
 python -m app.historical_evaluation evaluation/private/RUN/gold-candidates.jsonl \
@@ -46,3 +46,5 @@ python -m app.historical_evaluation evaluation/private/RUN/gold-candidates.jsonl
 Supply the model service's authentication through `JEV_API_KEY`, never a command argument. The normal launcher owns an ephemeral key; a separately launched local model with a controlled key is suitable for CLI evaluation. This runner compares the three aggregated submission answers with historical labels, records abstentions and incorrect non-abstaining answers, and refuses cross-split related groups. It does not claim to evaluate final institutional classifications, which may depend on eligibility, exceptions and external verification. Review labels/rationales never enter the model input. Keep the held-out split untouched while tuning on development records.
 
 Each completed proposal is saved to a sibling `.cases.jsonl` file with timing, individual check results and aggregation reasons. The aggregate JSON is written only after completion. Choose a fresh output name for every run; existing results are never overwritten. These diagnostic files contain private proposal evidence and must remain in `evaluation/private/`.
+
+The local MLX runner accepts `--backend mlx --model-path /absolute/staged/model --model-version FINGERPRINT` instead of an endpoint. Run it in the prepared MLX environment. Development comparisons can reuse actual scores only after verifying identical wire questions, context construction, retrieval configuration and evidence IDs; disclose replay and deterministic source guards separately from fresh end-to-end inference. Never present development selection as held-out validation.

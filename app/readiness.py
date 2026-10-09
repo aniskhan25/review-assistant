@@ -20,9 +20,16 @@ def decision_ready(state, qid, decision):
     if decision.get("confirmed"):
         return decision.get("reviewer_answer") in {"YES", "NO"}
     question = state["registry"]["questions"][qid]
-    # Negative recommendations remain exceptions, never automatic rejections.
-    return (not question.get("manual_only") and not decision.get("contradiction") and not decision.get("compatibility_unresolved")
-            and decision["status"] in {"OK", "AGGREGATED"} and decision["answer"] == "YES"
+    source_rule = decision.get("inference_mode") == "source_rule" and decision["status"] == "SOURCE_RULE_MATCH"
+    if source_rule and qid == "country_eligible":
+        from app.eligibility import reference_current
+        if not reference_current(decision.get("reference", {})):
+            return False
+    # Lack of prior installation is a setup warning, not a rejection. Clear
+    # negative installation answers can be included in the single final approval.
+    resolved_answer = decision["answer"] == "YES" or (qid == "code_previously_installed" and decision["answer"] == "NO")
+    return ((not question.get("manual_only") or source_rule) and not decision.get("contradiction") and not decision.get("compatibility_unresolved")
+            and decision["status"] in {"OK", "AGGREGATED", "SOURCE_RULE_MATCH"} and resolved_answer
             and decision["confidence"] >= state["policy"]["high_confidence"]
             and decision["margin"] >= state["policy"]["minimum_margin"]
             and bool(decision["evidence_ids"]) and state["extraction_resolved"])
