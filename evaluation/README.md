@@ -48,3 +48,21 @@ Supply the model service's authentication through `JEV_API_KEY`, never a command
 Each completed proposal is saved to a sibling `.cases.jsonl` file with timing, individual check results and aggregation reasons. The aggregate JSON is written only after completion. Choose a fresh output name for every run; existing results are never overwritten. These diagnostic files contain private proposal evidence and must remain in `evaluation/private/`.
 
 The local MLX runner accepts `--backend mlx --model-path /absolute/staged/model --model-version FINGERPRINT` instead of an endpoint. Run it in the prepared MLX environment. Development comparisons can reuse actual scores only after verifying identical wire questions, context construction, retrieval configuration and evidence IDs; disclose replay and deterministic source guards separately from fresh end-to-end inference. Never present development selection as held-out validation.
+
+## Compare Qwen and Kev on Apple Silicon
+
+`tools/stage_kev_models.py` downloads pinned public artifacts and verifies their SHA-256 hashes. It reads no private proposal data. Stage models while online, then run inference with the network guard enabled. Keep the benchmark environment separate from the application. The benchmark imports the pinned upstream Kev encoder, MLX backbone and FP32 pointer head from `models/kev-benchmark/source`; record the upstream commit in `revision.txt`. The 0.8B checkpoint uses its pinned BF16 base and merges its adapter. The 4B package uses an already merged 8-bit trunk and its saved head and temperature.
+
+The recorded runtime uses Python 3.12 and `deploy/kev-benchmark-requirements.txt`. Upstream Kev source is pinned to `5e42a7a03f28134853dd3ff77461457e921e5ec1`. Run `python -m tools.stage_kev_models` in the environment to stage weights and hash-verified source modules with their Apache license. All candidates use this same runtime for the comparison; the application's environment remains separate.
+
+```sh
+models/kev-benchmark/.venv/bin/python -m tools.benchmark_local_models \
+  --candidate baseline --dataset evaluation/private/RUN/gold-candidates.jsonl \
+  --split heldout --output evaluation/private/COMPARISON/baseline.json
+```
+
+Repeat sequentially with `--candidate kev-08b` and `--candidate kev-4b-8bit`. Freeze candidates, dataset, policy, registry and selection criteria before reading the held-out results. Use a development smoke case to catch integration failures. Do not tune confidence thresholds on held-out proposals.
+
+Each report records full review latency from stored extracted pages, loading time, MLX allocator peak, and separately sampled macOS physical footprint (50 ms interval). These memory figures overlap and must not be added together. PDF extraction is excluded. The first five observed model requests are replayed twice to distinguish a new state from a repeated state. Qwen has no cross-call prefix cache. Kev retains only the last state's prefix, so cache benefits depend on the application's retrieved evidence. Per-request input hashes allow shared calls to be checked across models; conditional corroboration can change call counts.
+
+Reports and request traces contain private proposal evidence and remain ignored by Git. Historical labels are provisional; three submission answers are evaluated, not the final institutional classification. A small held-out sample cannot establish production accuracy. The benchmark never changes the running app's backend or approval policy.
