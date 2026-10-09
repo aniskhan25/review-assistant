@@ -49,6 +49,10 @@ class SystemOneBackend:
         payload = {"state": state, "questions": {"review": wire_question(question)}}
         if self.name == "jevos":
             payload["model"] = "jev-latest"
+            if question.get("binary_evidence"):
+                payload["questions"]["review"] = {
+                    "type": "noul", "instructions": question["instructions"],
+                    "criteria": {"true": question["criteria"]["YES"], "false": question["criteria"]["NO"]}}
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = "Bearer " + self.api_key
@@ -60,7 +64,14 @@ class SystemOneBackend:
             body = response.read(100_001)
             if len(body) > 100_000:
                 raise ValueError("Model response too large")
-            return json.loads(body)["answers"]["review"]["probabilities"]
+            answer = json.loads(body)["answers"]["review"]
+            if self.name == "jevos" and question.get("binary_evidence"):
+                probability = answer["noul"]
+                if type(probability) not in (int, float) or not math.isfinite(probability) or not 0 <= probability <= 1:
+                    raise ValueError("Invalid binary evidence probability")
+                # UNKNOWN remains a policy abstention, not an invented model score.
+                return {"YES": probability, "NO": 1 - probability, "UNKNOWN": 0.0}
+            return answer["probabilities"]
         finally:
             connection.close()
 
@@ -164,6 +175,7 @@ def decide(backend, question_id, question, evidence, policy, context=""):
     if answer == "UNKNOWN":
         band = "reviewer required"
     return {"question_id": question_id, "question_version": question["version"],
+            "inference_mode": "binary_evidence" if backend.name == "jevos" and question.get("binary_evidence") else "choice",
             "model_answer": raw_answer, "answer": answer, "probabilities": probabilities,
             "confidence": confidence, "margin": margin, "band": band, "status": status,
             "model": backend.name, "model_version": backend.version,

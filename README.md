@@ -72,7 +72,7 @@ python -m app.server --reviewer your-id --backend masked \
   --model-path /approved/models/baseline --model-version YOUR_ARTIFACT_SHA256
 ```
 
-The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven top-level decisions, including two manual-only eligibility checks. Registry 3.0 runs ten internal checks behind the three submission answers, plus the scaling and official-build questions (twelve model calls total). See [narrow review checks](docs/narrow-review-checks.md). There is no GPU batching scheduler.
+The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven top-level decisions, including two manual-only eligibility checks. Registry 4.1 runs nine internal checks behind the three submission answers, plus the scaling and official-build questions (eleven model calls total). See [narrow review checks](docs/narrow-review-checks.md). There is no GPU batching scheduler.
 
 ## Configuration and policy
 

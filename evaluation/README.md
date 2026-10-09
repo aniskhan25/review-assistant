@@ -35,7 +35,7 @@ Proposed promotion gates: top-5 evidence recall ≥95%, high-confidence accuracy
 
 The private output contains an inventory, source fingerprints, candidate Fast Lane labels, separately retained other profiles, an issue report, and unlabelled narrow-check curation rows for development proposals. Review descriptions remain separate from proposal pages. Overall acceptance never becomes an inferred YES for every technical check. Groups use explicit cross-references and applicant filename matches; split assignments are provisional until related-project checks are complete. Pass all previously inspected/tuned examples via `--exposed` to keep their groups in development. Do not use Git for the generated source data.
 
-For registry 3.0, use the actual aggregation benchmark rather than the legacy broad-question runner:
+For registries 3.0 and 4.1, use the actual aggregation benchmark rather than the legacy broad-question runner:
 
 ```sh
 python -m app.historical_evaluation evaluation/private/RUN/gold-candidates.jsonl \

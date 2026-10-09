@@ -21,7 +21,7 @@ def decision_ready(state, qid, decision):
         return decision.get("reviewer_answer") in {"YES", "NO"}
     question = state["registry"]["questions"][qid]
     # Negative recommendations remain exceptions, never automatic rejections.
-    return (not question.get("manual_only") and not decision.get("contradiction")
+    return (not question.get("manual_only") and not decision.get("contradiction") and not decision.get("compatibility_unresolved")
             and decision["status"] in {"OK", "AGGREGATED"} and decision["answer"] == "YES"
             and decision["confidence"] >= state["policy"]["high_confidence"]
             and decision["margin"] >= state["policy"]["minimum_margin"]

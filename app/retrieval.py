@@ -16,6 +16,8 @@ def retrieve(evidence, question, limit=5):
     evidence = [e for e in evidence if e.get("scope") not in excluded]
     if "previous" not in question["sections"]:
         evidence = [e for e in evidence if e.get("scope") != "allocation_history"]
+    if question.get("restrict_sections"):
+        evidence = [e for e in evidence if any(s in e["section"].lower() for s in question["sections"])]
     if not evidence:
         return []
     bags = [Counter(tokens(e["text"])) for e in evidence]

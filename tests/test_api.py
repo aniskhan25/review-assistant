@@ -102,13 +102,17 @@ def test_systemone_protocol_and_no_redirect():
 
     class Model(BaseHTTPRequestHandler):
         redirect = False
+        binary_value = .9
 
         def log_message(self, *args):
             pass
 
         def do_POST(self):
             data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            assert data["questions"]["review"]["type"] == "choice"
+            question = data["questions"]["review"]
+            assert question["type"] in {"choice", "noul"}
+            if question["type"] == "noul":
+                assert question["criteria"] == {"true": "yes", "false": "no"}
             assert data["model"] == "jev-latest"
             if self.redirect:
                 self.send_response(302)
@@ -117,7 +121,8 @@ def test_systemone_protocol_and_no_redirect():
             else:
                 self.send_response(200)
                 self.end_headers()
-                self.wfile.write(json.dumps({"answers": {"review": {"probabilities": {"YES": .9, "NO": .01, "UNKNOWN": .09}}}}).encode())
+                answer = {"noul": self.binary_value} if question["type"] == "noul" else {"probabilities": {"YES": .9, "NO": .01, "UNKNOWN": .09}}
+                self.wfile.write(json.dumps({"answers": {"review": answer}}).encode())
 
     server = HTTPServer(("127.0.0.1", 0), Model)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -126,6 +131,12 @@ def test_systemone_protocol_and_no_redirect():
         backend = SystemOneBackend(f"http://127.0.0.1:{server.server_port}/v1/systemone", "jevos", "fixture")
         q = {"type": "choice", "instructions": "Test", "criteria": {"YES": "yes", "NO": "no", "UNKNOWN": "unknown"}}
         assert backend.decide("Evidence", q)["YES"] == .9
+        binary = dict(q, binary_evidence=True)
+        assert backend.decide("Evidence", binary) == {"YES": .9, "NO": pytest.approx(.1), "UNKNOWN": 0}
+        for invalid in [True, -1, 2, float('nan'), '0.9']:
+            Model.binary_value = invalid
+            with pytest.raises(ValueError):
+                backend.decide("Evidence", binary)
         Model.redirect = True
         with pytest.raises(ValueError):
             backend.decide("Evidence", q)
