@@ -85,7 +85,8 @@ function render() {
       card.append(el("p", d.aggregation_reason));
       const checks = el("details"); checks.open = !d.ready; checks.append(el("summary", "Evidence checks behind this answer"));
       for (const [cid, check] of Object.entries(d.checks)) {
-        checks.append(el("p", `${check.check_title}: ${check.answer} · ${check.status} · ${(check.confidence * 100).toFixed(1)}% top score · sources: ${check.evidence_ids.join(", ") || "none"}`));
+        const basis = check.inference_mode === "source_claim" ? "source evidence" : `${(check.confidence * 100).toFixed(1)}% top score`;
+        checks.append(el("p", `${check.check_title}: ${check.answer} · ${check.status} · ${basis} · sources: ${check.evidence_ids.join(", ") || "none"}`));
         if (check.source_quotes) checks.append(el("p", `Source-backed claim (not a model probability): ${check.source_quotes.join("; ")}`, "muted"));
         if (check.corroboration) checks.append(el("p", `Corroborating interpretation: ${check.corroboration.answer} · ${check.corroboration.status}. Opposite resolved answers require review.`, "muted"));
         for (const reference of state.registry.questions[qid].checks[cid]?.background_references || []) {

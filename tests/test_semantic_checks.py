@@ -157,3 +157,30 @@ def test_deterministic_capacity_failure_is_not_filtered_by_model_confidence():
     c = checks(goals_concrete='YES', jobs_budgeted='YES', execution_fits='YES')
     for check in c.values(): check['confidence'] = .7
     assert combine('workplan_sufficient', c, state)[0] == 'NO'
+
+
+def test_empty_form_headings_do_not_displace_actual_plan():
+    from app.retrieval import retrieve
+    evidence = [dict(id=str(i), section='Code details', scope='proposal', text='Code details #1\n4/8\nName and version of the code:') for i in range(8)]
+    evidence.append(dict(id='plan', section='Code details', scope='proposal', text='Train 10000 steps with PyTorch.'))
+    q = dict(sections=['code'], keywords=['code', 'version'], restrict_sections=True)
+    assert [e['id'] for e in retrieve(evidence, q)] == ['plan']
+
+
+def test_modern_playground_heading_is_technical_evidence():
+    from app.ingestion import document
+    from app.retrieval import retrieve
+    doc = document([{'page': 1, 'text': 'Code details, development and data management\nCode(s) used: PyTorch'}])
+    q = dict(sections=['code'], keywords=['PyTorch'], restrict_sections=True)
+    assert retrieve(doc['evidence'], q)
+
+
+def test_explicit_deferred_builds_are_not_contradicted_by_rocm_mention():
+    from app.review import new_review
+    from app.configuration import load_policy
+    from app.ingestion import document
+    from tests.helpers import TEXT
+    from tests.test_exception_workflow import PositiveBackend
+    text = TEXT + '\nCode details #1\nName and version of the code: PyTorch version pinned after training tests.\nWebpage and other references: docs\nCode details #2\nName and version of the code: ROCm version pinned after validation.\nWebpage and other references: docs'
+    d = new_review(document([{'page': 1, 'text': text}]), PositiveBackend(), load_policy(), 'test')['decisions']['software_gpu_capable']
+    assert d['answer'] == 'NO' and not d['contradiction'] and d['ready']

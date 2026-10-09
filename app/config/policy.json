@@ -1,5 +1,5 @@
 {
-  "version": "ai-access-evidence-first-2",
+  "version": "ai-access-evidence-first-3",
   "approved": false,
   "mode": "shadow",
   "gpu_units_per_node": 4,
@@ -49,6 +49,6 @@
   },
   "reviewer_requested_policy": {
     "date": "2026-10-09",
-    "basis": "Playground is an onboarding assessment; missing positive technical evidence may be answered NO without individual confirmation. Final reviewer approval remains required."
+    "basis": "Missing positive evidence can be answered NO; classifier uncertainty alone is not missing evidence. Final reviewer approval remains required."
   }
 }

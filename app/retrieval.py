@@ -4,6 +4,17 @@ import math
 import re
 from collections import Counter
 
+# Form headings and pagination are not evidence. In particular, an empty code
+# field must not displace an actual dependency or performance paragraph.
+FORM_LINE = re.compile(r"^(?:ID:\s*\S+|\d+/\d+|Code details(?: and feasibility|, development and data management|\s*#\d+)?|"
+                       r"Description of the code|Name and version of the code|Webpage and other references|"
+                       r"Scalability and performance|Describe the scalability and performance of the application|"
+                       r"Optimization of the work proposed|Project summary(?: \(abstract\))?|Work\s?plan)\s*:?$", re.I)
+
+
+def substantive_text(text):
+    return "\n".join(line for line in text.splitlines() if line.strip() and not FORM_LINE.fullmatch(line.strip()))
+
 
 def tokens(text):
     return re.findall(r"[\w-]+", text.lower())
@@ -18,9 +29,10 @@ def retrieve(evidence, question, limit=5):
         evidence = [e for e in evidence if e.get("scope") != "allocation_history"]
     if question.get("restrict_sections"):
         evidence = [e for e in evidence if any(s in e["section"].lower() for s in question["sections"])]
+    evidence = [e for e in evidence if substantive_text(e["text"])]
     if not evidence:
         return []
-    bags = [Counter(tokens(e["text"])) for e in evidence]
+    bags = [Counter(tokens(substantive_text(e["text"]))) for e in evidence]
     lengths = [sum(b.values()) for b in bags]
     average = sum(lengths) / len(lengths) or 1
     query = set(tokens(" ".join(question["keywords"])))

@@ -5,7 +5,7 @@ single-token A/B/C option scoring; it is **not Jevos, proprietary Jev, or the
 fine-tuned OpenJev decision-head model**. It generates no review prose and exposes
 raw uncalibrated option scores. Binary evidence checks score YES/NO; UNKNOWN
 remains a confidence/margin abstention. Choice checks also score UNKNOWN explicitly.
-Numeric thresholds are unchanged. Registry 4.2 requires strong support for combined negative findings and retains uncertainty when prior-use interpretations disagree. Literal workload quantities and explicit repeated version deferrals can be resolved from quoted source claims. MFU/GCD accounting assumptions remain exceptions.
+Numeric thresholds are unchanged. Registry 4.4 filters empty form headings and confines technical retrieval to relevant sections. Named supported frameworks, literal workload quantities and repeated version deferrals can be resolved from cited source claims. A modest positive score stays positive but requires review; classifier uncertainty is not converted into missing evidence. A genuinely empty required evidence search can yield NO. MFU/GCD accounting assumptions and conflicting prior-use interpretations remain exceptions. Source-backed scores indicate a rule match, not calibrated model accuracy.
 
 The public artifact is [mlx-community/Qwen3-4B-Instruct-2507-4bit](https://huggingface.co/mlx-community/Qwen3-4B-Instruct-2507-4bit),
 pinned to `50d427756c6b1b2fe0c0a10f67fbda1fc8e82c1b`, Apache-2.0.
@@ -47,5 +47,5 @@ remains an OS deployment responsibility, as with the other local backends.
 Saved reviews retain their original registry; upload again for current extraction,
 or re-run suggestions to use the selected model with the saved review's criteria.
 Re-running clears previous model-answer confirmations. Clear high-confidence installation
-NO answers can be prefilled as setup warnings; other negative recommendations require
+NO answers can be prefilled as setup warnings; clear negative technical answers can also be prefilled. Uncertain answers require
 review. Clear organisation categories and EU-member countries can be prefilled from source-backed rules; uncertain and uncovered eligibility conditions remain manual. Final approval remains explicit.

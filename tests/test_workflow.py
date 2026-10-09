@@ -107,6 +107,9 @@ def test_margin_and_no_evidence():
 
 def test_retrieval_and_contradiction_no_auto_reject():
     state = review()
+    for check in state["registry"]["questions"]["software_gpu_capable"]["checks"].values():
+        check.pop("software_source_check", None)
+    # Restriction checks are negative; the model nevertheless denies the AMD path.
     analyze(state, FakeBackend({"YES": .01, "NO": .98, "UNKNOWN": .01}))
     assert state["decisions"]["software_gpu_capable"]["contradiction"]
     assert not state["decisions"]["software_gpu_capable"]["ready"]

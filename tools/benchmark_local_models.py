@@ -152,6 +152,7 @@ def main():
     args = parser.parse_args()
     if args.output.exists() or args.output.with_suffix(".cases.jsonl").exists():
         parser.error("Choose a new output path")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     sys.path.insert(0, str(args.source.resolve()))
     install_network_guard()
     offline_environment()

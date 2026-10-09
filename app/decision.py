@@ -203,10 +203,11 @@ def build_backend(kind="manual", endpoint=None, model_path=None, version=None):
 
 
 def evidence_first(state, decision):
-    """NO means the positive criterion is not demonstrated; preserve raw model scores."""
+    """Missing supporting passages can mean NO; uncertainty is not their absence."""
     checks = list(decision.get("checks", {}).values()) or [decision]
     unresolved = next((check["status"] for check in checks
-                       if check["status"] in {"MODEL_ERROR", "MANUAL_REQUIRED", "CHECK_DISAGREEMENT"}), None)
+                       if check["status"] in {"MODEL_ERROR", "MANUAL_REQUIRED", "CHECK_DISAGREEMENT",
+                                              "ACCOUNTING_ASSUMPTION_REVIEW"}), None)
     if not state["extraction_resolved"]:
         unresolved = "EXTRACTION_INCOMPLETE"
     if decision.get("contradiction") or "conflict" in decision.get("aggregation_reason", "").lower():
@@ -218,11 +219,15 @@ def evidence_first(state, decision):
     if unresolved:
         decision.update(answer="UNKNOWN", status=unresolved, band="reviewer required")
         return decision
-    if decision["answer"] == "UNKNOWN" or decision["confidence"] < state["policy"]["high_confidence"]:
+    required = {"software_gpu_capable": {"dependencies_identified", "amd_path_supported"},
+                "code_previously_installed": {"prior_lumi_run"},
+                "workplan_sufficient": {"goals_concrete", "jobs_budgeted", "execution_fits", "onboarding_plan"}}
+    missing = (decision["status"] == "NO_EVIDENCE_FOUND" or any(
+        key in required.get(decision["question_id"], set()) and check["status"] == "NO_EVIDENCE_FOUND"
+        for key, check in decision.get("checks", {}).items()))
+    if decision["answer"] == "UNKNOWN" and missing:
         decision.update(answer="NO", status="EVIDENCE_NOT_DEMONSTRATED", band="evidence gap", compatibility_unresolved=False)
-        decision["aggregation_reason"] = ("NO means the positive criterion is not demonstrated by the supplied proposal, "
-                                          "not independently proven impossible. "
-                                          + decision.get("aggregation_reason", "The available supporting evidence did not meet the positive-answer threshold."))
+        decision["aggregation_reason"] = "No relevant supporting proposal passage was found for a required evidence check."
         if not decision["evidence_ids"]:
             # Record the passages searched, rather than inventing a supporting quote.
             searched = [e for e in state["document"]["evidence"] if e.get("scope") == "proposal"]

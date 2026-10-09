@@ -62,7 +62,11 @@ def analyze(state, backend):
         decision["confirmed_facts_hash"] = digest(confirmed_facts)
         # This flag asks for resolution; it never flips a model answer automatically.
         text = " ".join(e["text"] for e in evidence)
-        conflict = qid == "software_gpu_capable" and decision["model_answer"] == "NO" and re.search(r"\bROCm\b|\bAMD support\b", text, re.I)
+        checks = decision.get("checks", {})
+        blocker = any(checks.get(key, {}).get("answer") == "YES" for key in
+                      ("compatibility_blocker", "cuda_only_required"))
+        conflict = (qid == "software_gpu_capable" and decision["model_answer"] == "NO" and not blocker
+                    and re.search(r"\bROCm\b|\bAMD support\b", text, re.I))
         prior = state["facts"]["previous_lumi_use"]["value"]
         conflict = conflict or (qid == "code_previously_installed" and prior is True and decision["model_answer"] == "NO")
         decision["contradiction"] = bool(conflict)

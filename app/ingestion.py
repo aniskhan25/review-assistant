@@ -6,7 +6,7 @@ import re
 
 MAX_BYTES = 20 * 1024 * 1024
 MAX_TEXT = 1_000_000
-EXTRACTOR_VERSION = "embedded-fields-5"
+EXTRACTOR_VERSION = "embedded-fields-6"
 
 
 def form_regions(pages):
@@ -71,7 +71,7 @@ def document(pages, document_id=None):
     chunks = []
     section = "Unclassified"
     headings = re.compile(r"^(?:project summary(?: \(abstract\))?|ai factory selection|code\(s\) used|"
-                          r"code details(?: and feasibility| #\d+)?|description of the code|scalability and performance|"
+                          r"code details(?: and feasibility|, development and data management| #\d+)?|description of the code|scalability and performance|"
                           r"optimization of the work proposed|work\s?plan|ethics(?: self-assessment)?|privacy & data governance|"
                           r"resources|organi[sz]ation(?: details)?|submission details)$", re.I)
     for page in pages:

@@ -26,6 +26,13 @@ def assess(state, backend, qid, question, context):
     sources = list(dict.fromkeys(eid for key in used for eid in checks[key]["evidence_ids"]))
     confidence = min((checks[key]["confidence"] for key in used), default=0)
     margin = min((checks[key]["margin"] for key in used), default=0)
+    capacity_failure = qid == "workplan_sufficient" and "exceed continuous maximum capacity" in reason
+    if capacity_failure:
+        from app.readiness import fact_evidence
+        sources = list(dict.fromkeys(eid for key in
+            ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months")
+            for eid in fact_evidence(state, state["facts"][key])))
+        confidence = margin = 1.
     return {"question_id": qid, "question_version": question["version"],
             "model_answer": answer, "answer": answer, "probabilities": {},
             "confidence": confidence, "margin": margin,
@@ -35,9 +42,9 @@ def assess(state, backend, qid, question, context):
             "latency_ms": round(sum(d["latency_ms"] for d in checks.values()), 3),
             "evidence_ids": sources, "reviewer_answer": None, "reviewer_note": "", "confirmed": False,
             "checks": checks, "aggregation_reason": reason,
-            "compatibility_unresolved": (state["registry"].get("profile") != "PLAYGROUND" and state["registry"]["version"] in {"4.1", "4.2", "4.3"} and qid == "software_gpu_capable"
+            "compatibility_unresolved": (state["registry"].get("profile") != "PLAYGROUND" and state["registry"]["version"] in {"4.1", "4.2", "4.3", "4.4"} and qid == "software_gpu_capable"
                                           and checks["compatibility_blocker"]["answer"] == "UNKNOWN"),
-            "aggregation_version": {"4.3": "4", "4.2": "3", "4.1": "3", "4.0": "2"}.get(state["registry"]["version"], "1")}
+            "aggregation_version": {"4.4": "5", "4.3": "4", "4.2": "3", "4.1": "3", "4.0": "2"}.get(state["registry"]["version"], "1")}
 
 
 def resolve_corroboration(primary, secondary):
@@ -66,7 +73,7 @@ def combine(qid, checks, state):
 
 def _combine(qid, checks, state):
     # Saved reviews retain their original registry and aggregation semantics.
-    if state["registry"]["version"] not in {"4.0", "4.1", "4.2", "4.3"}:
+    if state["registry"]["version"] not in {"4.0", "4.1", "4.2", "4.3", "4.4"}:
         return combine_legacy(qid, checks, state)
 
     def is_answer(key, answer):
@@ -75,10 +82,10 @@ def _combine(qid, checks, state):
     if qid == "software_gpu_capable":
         if is_answer("compatibility_blocker", "YES"):
             return "NO", "A material software compatibility requirement remains unresolved; review the dependency or version requirement.", ["compatibility_blocker"]
-        if state["registry"]["version"] in {"4.1", "4.2", "4.3"}:
+        if state["registry"]["version"] in {"4.1", "4.2", "4.3", "4.4"}:
             answer, reason, used = combine_legacy(qid, checks, state)
             if answer == "YES":
-                if state["registry"]["version"] in {"4.2", "4.3"} and not is_answer("compatibility_blocker", "NO"):
+                if state["registry"]["version"] in {"4.2", "4.3", "4.4"} and not is_answer("compatibility_blocker", "NO"):
                     return "UNKNOWN", "Resolve the material compatibility check before concluding architecture suitability.", list(checks)
                 if is_answer("compatibility_blocker", "NO"):
                     used.append("compatibility_blocker")
@@ -113,7 +120,7 @@ def _combine(qid, checks, state):
         if is_answer(key, "NO"):
             return "NO", "The workplan has a material evidence gap: " + checks[key].get("check_title", key.replace("_", " ")), [key]
     required = ["goals_concrete", "execution_fits"]
-    if state["registry"]["version"] in {"4.1", "4.2", "4.3"}:
+    if state["registry"]["version"] in {"4.1", "4.2", "4.3", "4.4"}:
         required.append("jobs_budgeted")
     if all(is_answer(key, "YES") for key in required):
         return "YES", "Concrete targets, workload sizing and the execution assessment support feasibility; capacity arithmetic fits. Separate startup timing is not required.", required

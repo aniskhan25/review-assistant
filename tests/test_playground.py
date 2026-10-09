@@ -38,14 +38,18 @@ class NoSupport:
         return {'YES': .05, 'NO': .05, 'UNKNOWN': .9}
 
 
+def missing_text():
+    return TEXT.replace('Fast Lane', 'Playground').replace('Project summary', 'Submission details').split('Code details')[0]
+
+
 def test_missing_support_becomes_explained_no_with_one_final_approval():
-    state = playground(NoSupport())
+    state = playground(NoSupport(), missing_text())
     assert not any(state['exceptions'].values())
     assert state['draft_classification'] == 'REJECT'
     for key in ('software_gpu_capable', 'code_previously_installed', 'workplan_sufficient'):
         d = state['decisions'][key]
         assert d['answer'] == 'NO' and d['ready'] and not d['confirmed']
-        assert all(c['probabilities']['UNKNOWN'] == .9 for c in d['checks'].values())
+        assert any(c['status'] == 'NO_EVIDENCE_FOUND' for c in d['checks'].values())
     result = finalize(state, 'REJECT', state['draft_rationale'], True, rejection_details=['workplan'])
     assert 'Automated check basis' not in result['text']
     assert 'not independently proven impossible' not in result['text']
@@ -97,7 +101,7 @@ def test_empty_retrieval_records_search_scope_without_inventing_model_scores():
 
 
 def test_no_plan_omits_capacity_estimate_and_keeps_direct_reasons():
-    text = TEXT.replace('Fast Lane', 'Playground').replace('Maximum number of GPUs: 64', 'Maximum number of GPUs: 500000')
+    text = missing_text().replace('Maximum number of GPUs: 64', 'Maximum number of GPUs: 500000')
     state = playground(NoSupport(), text)
     assert not any(state['exceptions'].values())
     assert '0.000' not in state['draft']
@@ -110,16 +114,36 @@ def test_no_plan_omits_capacity_estimate_and_keeps_direct_reasons():
 
 
 def test_impossible_capacity_still_explains_rejection_without_a_plan():
-    text = TEXT.replace('Fast Lane', 'Playground').replace('Requested GPU hours: 50000', 'Requested GPU hours: 99999999')
+    text = missing_text().replace('Requested GPU hours: 50000', 'Requested GPU hours: 99999999')
     state = playground(NoSupport(), text)
     assert 'exceed the maximum' in state['draft']
     assert 'cannot be consumed within the declared duration' in state['draft_rationale']
 
 
 def test_final_approval_preserves_reviewer_rationale_and_notes():
-    state = playground(NoSupport())
+    state = playground(NoSupport(), missing_text())
     state['decisions']['workplan_sufficient']['reviewer_note'] = 'Only a business objective is supplied.'
     result = finalize(state, 'REJECT', 'Please name the software and describe a trial.', True, global_comment='A revised application is needed.')
     assert result['rationale'] == 'Please name the software and describe a trial.'
     assert 'Only a business objective is supplied.' in result['text']
     assert 'A revised application is needed.' in result['text']
+
+
+def test_classifier_uncertainty_is_not_missing_evidence():
+    state = playground(NoSupport())
+    d = state['decisions']['workplan_sufficient']
+    assert d['answer'] == 'UNKNOWN' and not d['ready']
+    assert d['status'] != 'EVIDENCE_NOT_DEMONSTRATED'
+    assert state['decisions']['software_gpu_capable']['answer'] == 'YES'
+
+
+def test_modest_positive_confidence_is_preserved_for_review():
+    class Modest(PositiveBackend):
+        def decide(self, text, question):
+            if question['title'].startswith('Is a concrete Playground'):
+                return {'YES': .7, 'NO': .2, 'UNKNOWN': .1}
+            return super().decide(text, question)
+    state = playground(Modest())
+    d = state['decisions']['workplan_sufficient']
+    assert d['answer'] == 'YES' and not d['ready']
+    assert d['confidence'] == .7

@@ -50,11 +50,11 @@ def test_reference_dates_must_be_valid_and_current():
 
 
 def test_playground_other_category_resolves_to_source_backed_negative():
-    from tests.test_playground import playground, NoSupport
+    from tests.test_playground import playground
     from tests.helpers import TEXT
     from app.review import finalize
     text = TEXT.replace('Fast Lane', 'Playground').replace('Organization type: SME', 'Organization type: Other\nOther: specify the organization type:\nHigher Education Institution / University')
-    state = playground(NoSupport(), text)
+    state = playground(text=text)
     fact = state['facts']['organization_type']
     decision = state['decisions']['organization_eligible']
     assert fact['value'] == 'Higher Education Institution / University' and fact['ready']
