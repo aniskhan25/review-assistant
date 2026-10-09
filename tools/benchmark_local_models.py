@@ -204,6 +204,7 @@ def main():
                   model_calls=len(wrapped.calls),
                   median_review_seconds=statistics.median(r["elapsed_seconds"] for r in result["cases"]),
                   registry_version=load_config("questions.json")["version"],
+                  registry_sha256=hashlib.sha256(json.dumps(load_config("questions.json"), sort_keys=True).encode()).hexdigest(),
                   policy_sha256=hashlib.sha256(json.dumps(load_policy(), sort_keys=True).encode()).hexdigest(),
                   dataset_sha256=hashlib.sha256(args.dataset.read_bytes()).hexdigest(),
                   kev_source_revision=(args.source / "revision.txt").read_text().strip(),

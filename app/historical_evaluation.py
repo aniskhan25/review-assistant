@@ -40,6 +40,7 @@ def benchmark(records, backend, policy, split="development", on_case=None):
                         "elapsed_seconds": round(time.monotonic() - started, 2),
                         "answers": {q: {"gold": record["gold"][q], "predicted": state["decisions"][q]["answer"],
                                         "status": state["decisions"][q]["status"],
+                                        "ready": state["decisions"][q]["ready"],
                                         "confidence": state["decisions"][q].get("confidence"),
                                         "aggregation_reason": state["decisions"][q].get("aggregation_reason"),
                                         "checks": state["decisions"][q].get("checks", {})} for q in QUESTIONS},

@@ -66,3 +66,16 @@ Repeat sequentially with `--candidate kev-08b` and `--candidate kev-4b-8bit`. Fr
 Each report records full review latency from stored extracted pages, loading time, MLX allocator peak, and separately sampled macOS physical footprint (50 ms interval). These memory figures overlap and must not be added together. PDF extraction is excluded. The first five observed model requests are replayed twice to distinguish a new state from a repeated state. Qwen has no cross-call prefix cache. Kev retains only the last state's prefix, so cache benefits depend on the application's retrieved evidence. Per-request input hashes allow shared calls to be checked across models; conditional corroboration can change call counts.
 
 Reports and request traces contain private proposal evidence and remain ignored by Git. Historical labels are provisional; three submission answers are evaluated, not the final institutional classification. A small held-out sample cannot establish production accuracy. The benchmark never changes the running app's backend or approval policy.
+
+## Compare the corrected workflow
+
+For the corrected-workflow development comparison, freeze the dataset, complete registry and policy hashes, candidate identities, baseline report/readiness hashes, development IDs, timing IDs and selection conditions before inspecting candidate results. The accuracy gate also checks each submission question independently: more correct answers elsewhere cannot hide a workplan regression. Lower latency alone does not compensate for more incorrect answers, incorrect prefills or review requirements. Keep the numeric confidence policy unchanged while comparing models.
+
+The current private experiment is `evaluation/private/kev-corrected-2026-10-09/`. It contains a frozen manifest, a fresh sixteen-proposal Kev run and a fresh Qwen timing run on four preselected matching cases. Full Qwen development accuracy/readiness comes from the previously verified exact-input replay; fresh timing answers must reproduce those recorded answers. The comparison validates matching criteria, policy, data and case IDs, and records per-question readiness separately from UNKNOWN counts. Eligibility and fact/extraction exceptions are outside these technical-answer counts.
+
+```sh
+models/kev-benchmark/.venv/bin/python -m tools.compare_corrected_models \
+  evaluation/private/kev-corrected-2026-10-09
+```
+
+The summary refuses to overwrite an existing result. Development selection remains separate from production qualification and fresh held-out validation. This experiment does not tune either model to the exposed evaluation labels.
