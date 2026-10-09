@@ -26,7 +26,9 @@ def test_real_pdf_to_confirmed_assessment():
     assert state["facts"]["vat_number_present"]["value"] is True
     result = finalize(confirmed(state), "ACCEPT", "Feasible independent experiments", True)
     assert "SHADOW DRAFT" in result["text"]
-    assert "1.085" in result["text"]
+    assert "fit within the theoretical capacity" in result["text"]
+    capacity = next(f["calculation"] for f in state["rules"]["findings"] if f["code"] == "resource_consumption")
+    assert capacity["minimum_months"] == pytest.approx(1.0850694444)
     assert result["citations"] and result["fact_citations"]
 
 

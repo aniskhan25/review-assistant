@@ -79,6 +79,31 @@ def refresh(state):
     prepare_review(state)
 
 
+
+def assessment_comment(state, qid, decision, templates):
+    answer = decision["reviewer_answer"] if decision["confirmed"] else decision["answer"]
+    default = templates[answer].get(qid, {
+        "organization_eligible": "The lead organisation does not meet the eligibility criteria.",
+        "country_eligible": "The lead organisation's country does not meet the eligibility criteria.",
+        "official_rocm_builds_available": "The proposal does not establish availability of suitable AMD/ROCm builds for the required dependencies.",
+    }.get(qid, "The proposal does not demonstrate that this requirement is met."))
+    if answer != "NO" or (decision["confirmed"] and answer != decision["answer"]):
+        return default
+    checks = decision.get("checks", {})
+    if qid == "software_gpu_capable":
+        if checks.get("cuda_only_required", {}).get("answer") == "YES":
+            return "A required software dependency is CUDA-only and no AMD alternative is described."
+        if checks.get("dependencies_identified", {}).get("answer") in {"NO", "UNKNOWN"}:
+            return "The proposal does not identify the core software frameworks or libraries. Suitability for LUMI-G cannot be established."
+        if checks.get("compatibility_blocker", {}).get("answer") == "YES":
+            return "A material software compatibility requirement remains unresolved. The proposal does not establish a working AMD-compatible stack."
+    if qid == "workplan_sufficient":
+        if any(f["code"] == "resource_consumption" and f["severity"] == "blocker" for f in state["rules"]["findings"]):
+            return "The requested GPU-hours cannot be consumed within the declared duration, even at continuous maximum concurrency."
+        if state["registry"].get("profile") == "PLAYGROUND":
+            return "The proposal does not describe a concrete onboarding task or small experiment. Feasibility within the requested allocation cannot be assessed."
+    return default
+
 def prepare_review(state):
     state["rules"] = evaluate(state, state["policy"])
     for fact in state["facts"].values():
@@ -100,9 +125,11 @@ def prepare_review(state):
     state["draft_classification"] = None
     state["draft_rationale"] = ""
     if not any(state["exceptions"].values()) and (state["facts"]["access_mode"]["value"] == "FAST_LANE" or state["registry"].get("profile") == "PLAYGROUND") and state["facts"]["target_machine"]["value"].upper() in {"LUMI-G", "LUMI G"}:
-        blockers = [f["message"] for f in evaluate(state, state["policy"])["findings"] if f["severity"] == "blocker"]
+        blockers = [assessment_comment(state, f["code"], state["decisions"][f["code"]], templates)
+                    if f["code"] in state["decisions"] else f["message"]
+                    for f in state["rules"]["findings"] if f["severity"] == "blocker"]
         classification = "REJECT" if blockers else "ACCEPT"
-        rationale = "; ".join(blockers) if blockers else "The reviewed evidence supports technical feasibility within the requested resources and duration."
+        rationale = " ".join(dict.fromkeys(blockers)) if blockers else "The reviewed evidence supports technical feasibility within the requested resources and duration."
         preview = finalize(copy.deepcopy(state), classification, rationale, True)
         state["draft"] = "PREVIEW — awaiting your final approval\n\n" + preview["text"]
         state["draft_classification"] = classification
@@ -237,21 +264,22 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
     citations = {qid: d["reviewer_evidence_ids"] for qid, d in decisions.items()}
     for qid, title in templates["form_questions"].items():
         d = decisions[qid]
-        wording = templates[d["reviewer_answer"]][qid]
-        if d["reviewer_answer"] == "NO" and d.get("status") == "EVIDENCE_NOT_DEMONSTRATED":
-            wording = "The supplied proposal does not demonstrate " + {"software_gpu_capable": "suitability of the named software for the target architecture.", "code_previously_installed": "previous installation or use on LUMI.", "workplan_sufficient": "a feasible plan for the requested allocation."}[qid]
-        lines += [title, d["reviewer_answer"], wording]
-        if d.get("aggregation_reason"):
-            lines.append("Automated check basis: " + d["aggregation_reason"])
+        lines += [title, d["reviewer_answer"], assessment_comment(state, qid, d, templates)]
         if d["reviewer_note"]:
             lines.append(d["reviewer_note"])
         lines.append("")
     lines.append("Comment globally on the provided technical data and your conclusions:")
     if global_comment:
         lines.append(global_comment)
-    calculation = next(f["calculation"] for f in rules["findings"] if f["code"] == "resource_consumption")
-    lines += [f"At continuous maximum concurrency, the requested allocation requires {calculation['minimum_months']:.3f} 30-day months.",
-              "This calculation does not guarantee scheduling availability."]
+    capacity = next(f for f in rules["findings"] if f["code"] == "resource_consumption")
+    calculation = capacity["calculation"]
+    if capacity["severity"] == "blocker":
+        maximum = calculation["maximum_number_of_gpus"] * 24 * 30 * calculation["project_duration_months"]
+        lines.append(f"The requested {calculation['requested_gpu_hours']:,.0f} GPU-hours exceed the maximum of {maximum:,.0f} GPU-hours within the declared duration, even at continuous maximum concurrency.")
+    elif decisions["workplan_sufficient"]["reviewer_answer"] == "NO":
+        lines.append("The information provided is insufficient to assess the workload or justify the requested GPU allocation.")
+    else:
+        lines.append("The requested GPU-hours fit within the theoretical capacity for the declared duration. Actual runtime and scheduling availability depend on the workload.")
     if any(f["code"] == "storage" and f["severity"] == "warning" for f in rules["findings"]):
         lines.append(templates["storage_warning"].replace("50,000", f"{state['policy']['storage_warning_gb']:,.0f}"))
     lines += ["", "Classification:", classification_label, "", "Reason for classification:", rationale]

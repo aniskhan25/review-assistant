@@ -1,17 +1,17 @@
 {
   "YES": {
-    "software_gpu_capable": "The reviewer confirms a plausible AMD/ROCm execution path for the proposed software.",
-    "code_previously_installed": "The reviewer confirms previous installation/use or an available standard environment on LUMI.",
-    "workplan_sufficient": "The reviewer confirms that the targets are feasible within the requested allocation and calendar time, allowing for installation, data transfer and preprocessing.",
+    "software_gpu_capable": "The proposed software has a plausible AMD/ROCm execution path on LUMI-G.",
+    "code_previously_installed": "The proposal documents previous LUMI use or a standard LUMI environment sufficient for the workflow.",
+    "workplan_sufficient": "The proposed tasks are feasible within the requested allocation and duration.",
     "scaling_strategy_adequate": "The reviewer confirms that the execution strategy can use the requested concurrency."
   },
   "NO": {
-    "software_gpu_capable": "Suitability for the target AMD GPU architecture is not established by the supplied software evidence. See the assessment basis below for missing dependencies or identified incompatibilities.",
-    "code_previously_installed": "Prior LUMI installation is not established; installation work introduces startup risk.",
-    "workplan_sufficient": "The reviewer finds the workplan insufficient or the targets infeasible within the requested allocation and calendar time.",
+    "software_gpu_capable": "The proposal does not establish that the software is suitable for the target AMD GPU architecture.",
+    "code_previously_installed": "Previous installation or use of the proposed software on LUMI is not documented. Allow for installation and initial testing.",
+    "workplan_sufficient": "The workplan does not provide enough information to establish feasibility within the requested allocation and duration.",
     "scaling_strategy_adequate": "The reviewer finds the proposed execution strategy inadequate for the requested concurrency."
   },
-  "version": "review-template-2",
+  "version": "review-template-3",
   "form_questions": {
     "software_gpu_capable": "Are the codes to be used in the project suitable for the architecture of the machine chosen?",
     "code_previously_installed": "Is the code installed on the machine chosen?",

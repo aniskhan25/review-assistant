@@ -47,7 +47,8 @@ def test_missing_support_becomes_explained_no_with_one_final_approval():
         assert d['answer'] == 'NO' and d['ready'] and not d['confirmed']
         assert all(c['probabilities']['UNKNOWN'] == .9 for c in d['checks'].values())
     result = finalize(state, 'REJECT', state['draft_rationale'], True, rejection_details=['workplan'])
-    assert 'not independently proven impossible' in result['text']
+    assert 'Automated check basis' not in result['text']
+    assert 'not independently proven impossible' not in result['text']
     assert 'concrete onboarding task' in result['text']
     assert 'identifies an incompatibility' not in result['text']
 
@@ -93,3 +94,32 @@ def test_empty_retrieval_records_search_scope_without_inventing_model_scores():
     assert d['answer'] == 'NO' and d['ready']
     assert d['evidence_ids'] and 'searched' in d['evidence_scope']
     assert d['checks']['onboarding_plan']['status'] == 'NO_EVIDENCE_FOUND'
+
+
+def test_no_plan_omits_capacity_estimate_and_keeps_direct_reasons():
+    text = TEXT.replace('Fast Lane', 'Playground').replace('Maximum number of GPUs: 64', 'Maximum number of GPUs: 500000')
+    state = playground(NoSupport(), text)
+    assert not any(state['exceptions'].values())
+    assert '0.000' not in state['draft']
+    assert '30-day months' not in state['draft']
+    assert 'Automated check basis' not in state['draft']
+    assert 'NO means' not in state['draft']
+    assert 'NO: Is' not in state['draft_rationale']
+    assert 'justify the requested GPU allocation' in state['draft']
+    assert any(f['code'] == 'resource_consumption' and f['calculation']['minimum_months'] > 0 for f in state['rules']['findings'])
+
+
+def test_impossible_capacity_still_explains_rejection_without_a_plan():
+    text = TEXT.replace('Fast Lane', 'Playground').replace('Requested GPU hours: 50000', 'Requested GPU hours: 99999999')
+    state = playground(NoSupport(), text)
+    assert 'exceed the maximum' in state['draft']
+    assert 'cannot be consumed within the declared duration' in state['draft_rationale']
+
+
+def test_final_approval_preserves_reviewer_rationale_and_notes():
+    state = playground(NoSupport())
+    state['decisions']['workplan_sufficient']['reviewer_note'] = 'Only a business objective is supplied.'
+    result = finalize(state, 'REJECT', 'Please name the software and describe a trial.', True, global_comment='A revised application is needed.')
+    assert result['rationale'] == 'Please name the software and describe a trial.'
+    assert 'Only a business objective is supplied.' in result['text']
+    assert 'A revised application is needed.' in result['text']
