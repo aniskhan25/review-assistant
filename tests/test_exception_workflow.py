@@ -48,7 +48,7 @@ def test_ambiguous_facts_still_block(change):
         finalize(state, "ACCEPT", "why", True)
 
 
-@pytest.mark.parametrize("change", ["low", "negative", "contradiction", "error"])
+@pytest.mark.parametrize("change", ["low", "contradiction", "error"])
 def test_model_exceptions_cannot_slip_through_final_gate(change):
     state = ready_review()
     decision = state["decisions"]["workplan_sufficient"]

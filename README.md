@@ -1,6 +1,6 @@
 # Local technical review assistant
 
-A local, evidence-assisted Fast Lane/LUMI-G review application. PDF parsing, lexical retrieval, structured facts, deterministic checks, reviewer confirmations, assessment templates, SQLite audit records and offline evaluation are implemented. The interface works without a model.
+A local, evidence-assisted Fast Lane and Playground/LUMI-G review application. PDF parsing, lexical retrieval, structured facts, deterministic checks, reviewer confirmations, assessment templates, SQLite audit records and offline evaluation are implemented. The interface works without a model.
 
 **The default is a shadow prototype, not an approved production reviewer.** Sample proposals, an internal guide and a review template have been supplied and used to refine the workflow. Historical reviewer-labelled decisions, policy sign-off, model weights and deployment hardware remain outstanding. The bundled 20 cases are explicitly synthetic. Jevos-v4 is staged and operationally tested on this Mac as the initial model candidate; it has not been qualified for production accuracy.
 
@@ -40,7 +40,7 @@ The extractor supports consolidated EuroHPC forms, including wrapped labels/valu
 
 Previous-allocation sections are excluded from current application fields, including access mode and requested resources. The current mode can also be read from the submission's accepted policy paragraph, including paragraphs continuing on the next page; a bare URL or application-ID prefix is insufficient. Partition forms preserve node-hours, per-job GPU counts, simultaneous jobs, storage tiers in TB, storage-hours in TBh, and TB transfers separately. These are never silently converted to total GPU-hours, total concurrency, or GB. Optional partition fields are shown only when present or conflicting. Wrapped software lists are preserved.
 
-Science, Large Scale and Playground applications support evidence inspection only. Their detected profiles bypass the Fast Lane model and rule engine, and cannot produce a final Fast Lane assessment. A missing current mode also prevents Fast Lane rule execution until verified.
+Science and Large Scale applications support evidence inspection only. Playground uses its own onboarding profile: a named AMD-capable stack and a concrete trial or exploratory task suffice, without detailed job budgets, measured scaling or exact build verification. A missing current mode also prevents Fast Lane rule execution until verified.
 
 After updating the parser or review policy, restart the service and upload the PDF again to create a newly extracted review. Existing saved reviews preserve their original extraction and confirmations; re-running model suggestions does not re-extract their fields.
 
@@ -74,7 +74,7 @@ python -m app.server --reviewer your-id --backend masked \
   --model-path /approved/models/baseline --model-version YOUR_ARTIFACT_SHA256
 ```
 
-The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven top-level decisions, including two eligibility checks resolved from source-backed rules where possible. Registry 4.2 runs nine internal checks behind the three submission answers, plus scaling/build questions and a prior-use consistency check (up to twelve model calls; literal source claims can bypass calls). See [narrow review checks](docs/narrow-review-checks.md). There is no GPU batching scheduler.
+The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven top-level decisions, including two eligibility checks resolved from source-backed rules where possible. Registry 4.3 retains nine Fast Lane internal checks behind the three submission answers, plus scaling/build questions and a prior-use consistency check (up to twelve model calls; literal source claims can bypass calls). See [narrow review checks](docs/narrow-review-checks.md). There is no GPU batching scheduler.
 
 ## Configuration and policy
 
@@ -82,7 +82,7 @@ The baseline loads with `local_files_only=True` and `trust_remote_code=False`, s
 
 The supplied internal guide sets four full MI250X modules per node (two GCDs per module) and a storage warning above 50,000 GB. Storage alone does not trigger rejection. See the [derived review rubric](docs/review-rubric.md) for sources, interpretations and unresolved approval gates. The capacity calculation uses exactly the plan's 24 × 30 hour convention and cannot promise scheduler availability.
 
-Only `FAST_LANE` and `LUMI-G` final assessments are supported. Installation alone is a warning. Independent concurrent jobs are valid scaling. Clear high-confidence negative installation answers are prefilled as setup warnings. Other unconfirmed model negatives are referrals; deterministic impossible capacity can produce a suggested rejection, but **every final classification still needs reviewer confirmation**.
+Final assessments support `FAST_LANE` and `PLAYGROUND` on `LUMI-G`. Installation alone is a warning. Independent concurrent jobs are valid scaling. Clear high-confidence negative installation answers are prefilled as setup warnings. New uploads use an evidence-first policy: insufficient supporting evidence produces NO (not demonstrated) rather than an evidence-gap UNKNOWN. Negative answers can be prefilled for final approval; installation NO remains only a setup warning. Raw model scores are preserved. Extraction failures, model errors, contradictory evidence, missing required facts and unresolved legal eligibility still need resolution. Deterministic impossible capacity can suggest rejection, but **every final classification still needs reviewer confirmation**.
 
 The export follows the template’s three form questions, global comments and classification. Internal checks also cover scaling, official ROCm builds, organisation and country eligibility. Clear declared startup/SME/public-sector categories and EU-member countries can be prefilled using the guide and a dated reference subset. Large-enterprise conditions, other countries and uncertain declarations still need manual verification and a note. The EU reference expires on 2027-10-09; it does not cover all affiliated countries. Accepted personal-data projects receive the template’s DPA paragraph and a visible CCR follow-up task. No notifications or enrolments are sent by the app. Previous LUMI use remains optional; installation and startup feasibility must still be reviewed.
 
@@ -133,3 +133,5 @@ All API requests use `Authorization: Bearer <reviewer key>`. Mutation JSON inclu
 ## Adapter references
 
 The adapters were implemented against the public [jevos wire interface](https://github.com/feder-cr/jev) and [OpenJev-4B inference interface](https://github.com/ejhshen/OpenJev/blob/main/docs/INFERENCE.md). The [lookski/OpenJev implementation](https://github.com/lookski/openjev) is another optional SystemOne-compatible candidate; its hosted backends are not used here. Pin and review upstream source, licenses and model artifacts before staging. Protocol tests use local fixtures; Jevos-v4 has now been tested with real staged weights on Apple Silicon. The MLX option scorer has been evaluated with real local weights on sixteen development proposals; reports distinguish it from Jevos. Other adapters remain unverified with real weights.
+
+New uploads receive registry 4.3. Saved reviews retain their original registry; reupload to use the Playground profile and evidence-first policy. This change is a reviewer-requested decision policy, not model retraining or a measured accuracy improvement.

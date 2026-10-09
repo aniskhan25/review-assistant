@@ -35,9 +35,9 @@ def assess(state, backend, qid, question, context):
             "latency_ms": round(sum(d["latency_ms"] for d in checks.values()), 3),
             "evidence_ids": sources, "reviewer_answer": None, "reviewer_note": "", "confirmed": False,
             "checks": checks, "aggregation_reason": reason,
-            "compatibility_unresolved": (state["registry"]["version"] in {"4.1", "4.2"} and qid == "software_gpu_capable"
+            "compatibility_unresolved": (state["registry"].get("profile") != "PLAYGROUND" and state["registry"]["version"] in {"4.1", "4.2", "4.3"} and qid == "software_gpu_capable"
                                           and checks["compatibility_blocker"]["answer"] == "UNKNOWN"),
-            "aggregation_version": {"4.2": "3", "4.1": "3", "4.0": "2"}.get(state["registry"]["version"], "1")}
+            "aggregation_version": {"4.3": "4", "4.2": "3", "4.1": "3", "4.0": "2"}.get(state["registry"]["version"], "1")}
 
 
 def resolve_corroboration(primary, secondary):
@@ -51,6 +51,8 @@ def resolve_corroboration(primary, secondary):
 
 
 def combine(qid, checks, state):
+    if state["registry"].get("profile") == "PLAYGROUND":
+        return combine_playground(qid, checks, state)
     answer, reason, used = _combine(qid, checks, state)
     facts = state["facts"]
     capacity_failure = (qid == "workplan_sufficient"
@@ -64,7 +66,7 @@ def combine(qid, checks, state):
 
 def _combine(qid, checks, state):
     # Saved reviews retain their original registry and aggregation semantics.
-    if state["registry"]["version"] not in {"4.0", "4.1", "4.2"}:
+    if state["registry"]["version"] not in {"4.0", "4.1", "4.2", "4.3"}:
         return combine_legacy(qid, checks, state)
 
     def is_answer(key, answer):
@@ -73,10 +75,10 @@ def _combine(qid, checks, state):
     if qid == "software_gpu_capable":
         if is_answer("compatibility_blocker", "YES"):
             return "NO", "A material software compatibility requirement remains unresolved; review the dependency or version requirement.", ["compatibility_blocker"]
-        if state["registry"]["version"] in {"4.1", "4.2"}:
+        if state["registry"]["version"] in {"4.1", "4.2", "4.3"}:
             answer, reason, used = combine_legacy(qid, checks, state)
             if answer == "YES":
-                if state["registry"]["version"] == "4.2" and not is_answer("compatibility_blocker", "NO"):
+                if state["registry"]["version"] in {"4.2", "4.3"} and not is_answer("compatibility_blocker", "NO"):
                     return "UNKNOWN", "Resolve the material compatibility check before concluding architecture suitability.", list(checks)
                 if is_answer("compatibility_blocker", "NO"):
                     used.append("compatibility_blocker")
@@ -111,7 +113,7 @@ def _combine(qid, checks, state):
         if is_answer(key, "NO"):
             return "NO", "The workplan has a material evidence gap: " + checks[key].get("check_title", key.replace("_", " ")), [key]
     required = ["goals_concrete", "execution_fits"]
-    if state["registry"]["version"] in {"4.1", "4.2"}:
+    if state["registry"]["version"] in {"4.1", "4.2", "4.3"}:
         required.append("jobs_budgeted")
     if all(is_answer(key, "YES") for key in required):
         return "YES", "Concrete targets, workload sizing and the execution assessment support feasibility; capacity arithmetic fits. Separate startup timing is not required.", required
@@ -154,3 +156,21 @@ def combine_legacy(qid, checks, state):
     if all(is_answer(key, "YES") for key in checks):
         return "YES", "Goals, job budget, startup allowance and execution strategy support feasibility; capacity arithmetic fits.", list(checks)
     return "UNKNOWN", "Resolve missing evidence about goals, job budgets, startup allowance or achievable targets.", list(checks)
+
+
+def combine_playground(qid, checks, state):
+    if qid == "software_gpu_capable":
+        return combine_legacy(qid, checks, state)
+    if qid == "code_previously_installed":
+        return _combine(qid, checks, state)
+    facts = state["facts"]
+    keys = ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months")
+    if not all(facts[key]["status"] == "PRESENT" for key in keys):
+        return "UNKNOWN", "Resource amounts and duration need verification.", list(checks)
+    hours, gpus, months = (facts[key]["value"] for key in keys)
+    if hours > gpus * 24 * 30 * months:
+        return "NO", "Requested GPU-hours exceed continuous maximum capacity within the project duration.", list(checks)
+    check = checks["onboarding_plan"]
+    if check["status"] == "OK" and check["answer"] == "YES":
+        return "YES", "A concrete onboarding or exploratory task is described; capacity arithmetic fits. Playground does not require a detailed job budget or measured scaling.", ["onboarding_plan"]
+    return "NO" if check["answer"] == "NO" else "UNKNOWN", "The proposal does not demonstrate a concrete onboarding task or small experiment for this allocation.", ["onboarding_plan"]

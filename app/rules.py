@@ -1,4 +1,4 @@
-"""Deterministic Fast Lane checks. Model negatives are referrals until confirmed."""
+"""Common AI-access checks, with versioned readiness for technical negatives."""
 
 
 from app.readiness import decision_ready
@@ -15,8 +15,8 @@ def evaluate(state, policy):
         fact = facts[key]
         return fact["value"] if fact["status"] == "PRESENT" else None
 
-    if value("access_mode") != "FAST_LANE":
-        add("unsupported_profile", "attention", "Fast Lane rules were not applied. This access mode needs its own approved review profile.")
+    if value("access_mode") not in {"FAST_LANE", "PLAYGROUND"} or (value("access_mode") == "PLAYGROUND" and state["registry"].get("profile") != "PLAYGROUND"):
+        add("unsupported_profile", "attention", "This access mode needs a matching review profile; no technical rules were applied.")
         return {"version": policy["version"], "findings": findings, "suggested": "REVIEW_REQUIRED"}
     if value("target_machine") is None or value("target_machine").upper() not in {"LUMI-G", "LUMI G"}:
         add("target_machine", "attention", "Verify that the target is LUMI-G.")
@@ -66,7 +66,9 @@ def evaluate(state, policy):
             add(qid, "attention", "Reviewer confirmation required: " + qid)
         elif answer == "NO":
             add(qid, "warning" if qid == "code_previously_installed" else "blocker",
-                ("Reviewer confirmed NO: " if decision["confirmed"] else "Prefilled setup warning (prior use not established): ") + qid)
+                ("Reviewer confirmed NO: " if decision["confirmed"] else "NO: ")
+                + state["registry"]["questions"][qid]["title"]
+                + (" " + decision["aggregation_reason"] if decision.get("aggregation_reason") else ""))
         if decision.get("contradiction") and not decision["confirmed"]:
             add("contradiction_" + qid, "attention", "Evidence and recommendation conflict; human resolution required.")
     suggested = "REJECT" if any(f["severity"] == "blocker" for f in findings) else (

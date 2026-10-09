@@ -1,8 +1,8 @@
 {
-  "version": "4.2",
+  "version": "4.3",
   "questions": {
     "software_gpu_capable": {
-      "version": "4.2",
+      "version": "4.3",
       "type": "choice",
       "options": [
         "YES",
@@ -130,10 +130,11 @@
           "binary_evidence": true,
           "explicit_version_deferral": true
         }
-      }
+      },
+      "evidence_first": true
     },
     "code_previously_installed": {
-      "version": "4.2",
+      "version": "4.3",
       "type": "choice",
       "options": [
         "YES",
@@ -248,10 +249,11 @@
           "restrict_sections": true,
           "binary_evidence": true
         }
-      }
+      },
+      "evidence_first": true
     },
     "workplan_sufficient": {
-      "version": "4.2",
+      "version": "4.3",
       "type": "choice",
       "options": [
         "YES",
@@ -377,10 +379,11 @@
           "binary_evidence": true,
           "accounting_assumption_guard": true
         }
-      }
+      },
+      "evidence_first": true
     },
     "scaling_strategy_adequate": {
-      "version": "1.0",
+      "version": "4.3",
       "type": "choice",
       "options": [
         "YES",
@@ -409,10 +412,11 @@
         "independent",
         "scaling",
         "DDP"
-      ]
+      ],
+      "evidence_first": true
     },
     "official_rocm_builds_available": {
-      "version": "1.0",
+      "version": "4.3",
       "type": "choice",
       "options": [
         "YES",
@@ -442,7 +446,8 @@
       ],
       "manual_only": false,
       "include_lead_evidence": false,
-      "require_note": false
+      "require_note": false,
+      "evidence_first": true
     },
     "organization_eligible": {
       "version": "1.1",

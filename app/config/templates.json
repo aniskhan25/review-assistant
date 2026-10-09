@@ -6,12 +6,12 @@
     "scaling_strategy_adequate": "The reviewer confirms that the execution strategy can use the requested concurrency."
   },
   "NO": {
-    "software_gpu_capable": "The reviewer identifies an incompatibility with the target AMD GPU architecture.",
+    "software_gpu_capable": "Suitability for the target AMD GPU architecture is not established by the supplied software evidence. See the assessment basis below for missing dependencies or identified incompatibilities.",
     "code_previously_installed": "Prior LUMI installation is not established; installation work introduces startup risk.",
     "workplan_sufficient": "The reviewer finds the workplan insufficient or the targets infeasible within the requested allocation and calendar time.",
     "scaling_strategy_adequate": "The reviewer finds the proposed execution strategy inadequate for the requested concurrency."
   },
-  "version": "review-template-1",
+  "version": "review-template-2",
   "form_questions": {
     "software_gpu_capable": "Are the codes to be used in the project suitable for the architecture of the machine chosen?",
     "code_previously_installed": "Is the code installed on the machine chosen?",

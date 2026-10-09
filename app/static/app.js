@@ -48,7 +48,8 @@ function render() {
   const root = $("review"); root.replaceChildren();
   const heading = el("div", undefined, "row"); heading.append(el("h2", `Review ${state.id.slice(0, 8)}`), el("span", `Revision ${state.revision}`, "badge")); root.append(heading);
   root.append(el("small", `Proposal hash: ${state.document.document_id}`));
-  if (state.facts.access_mode.value && state.facts.access_mode.value !== "FAST_LANE") root.append(el("p", `Detected access mode: ${state.facts.access_mode.value}. Evidence inspection is available; Fast Lane model recommendations, rules and final export do not apply.`, "banner warning"));
+  if (state.facts.access_mode.value && !["FAST_LANE", "PLAYGROUND"].includes(state.facts.access_mode.value)) root.append(el("p", `Detected access mode: ${state.facts.access_mode.value}. Evidence inspection is available; Fast Lane model recommendations, rules and final export do not apply.`, "banner warning"));
+  if (state.registry.profile === "PLAYGROUND") root.append(el("p", "Playground onboarding review: a named AMD-capable stack and a concrete trial or onboarding task are sufficient. Detailed job budgets and measured scaling are not required.", "banner"));
   const exceptions = state.exceptions || {facts: [], decisions: []};
   root.append(el("p", `${exceptions.facts.length} fact gaps · ${exceptions.decisions.length} decision exceptions. Clear facts and supported answers are prefilled for final approval.`, "banner"));
   if (state.document.warnings.length) {
@@ -96,6 +97,7 @@ function render() {
     const noInference = ["MANUAL_REQUIRED", "NO_EVIDENCE_FOUND", "MODEL_ERROR", "UNSUPPORTED_PROFILE"].includes(d.status);
     if (d.inference_mode === "source_rule") card.append(el("p", `${d.reference_reason} Reference: ${d.reference.source || "supplied internal guide"}. This is a rule match, not a model probability.`));
     else card.append(el("small", noInference ? "No valid model inference is available. Review the evidence and record your answer." : d.checks ? `${d.model} · combined using explicit rules; minimum supporting check score ${(d.confidence * 100).toFixed(1)}%. This is not a probability of the combined answer.` : `${d.model} / ${d.model_version} · top probability ${(d.confidence * 100).toFixed(1)}% · margin ${d.margin.toFixed(2)} · ${d.latency_ms} ms. Scores are advisory and not calibrated accuracy.`));
+    if (d.status === "EVIDENCE_NOT_DEMONSTRATED") card.append(el("p", "NO: supporting evidence is not sufficient to establish this criterion. This is an evidence gap, not proof of incompatibility or impossibility.", "muted"));
     if (d.contradiction) card.append(el("p", "Possible evidence/decision contradiction. Explain your resolution in the note.", "banner warning"));
     for (const id of d.evidence_ids) { const ev = state.document.evidence.find(e => e.id === id); if (ev) card.append(evidenceCard(ev)); }
     if (!d.evidence_ids.length) card.append(el("p", "No relevant evidence retrieved. Inspect all passages or add a page transcription.", "warning"));

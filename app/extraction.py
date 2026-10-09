@@ -11,7 +11,7 @@ FIELDS = {
     "project_duration_months": ("positive", ["project duration (months)", "project duration months", "project duration"]),
     "organization_type": ("text", ["organization type", "organisation type"]),
     "country": ("text", ["country", "organization country", "organisation country", "organization country - horizon 2020", "organisation country - horizon 2020"]),
-    "vat_number": ("text", ["vat number", "vat", "organization vat number", "organisation vat number"]),
+    "vat_number": ("text", ["vat number", "vat", "organization vat number", "organisation vat number", "company vat number", "company tax number"]),
     "requested_gpu_hours": ("positive", ["requested amount of resources (gpu hours)", "requested gpu hours", "gpu hours"]),
     "maximum_number_of_gpus": ("integer", ["maximum number of gpus", "maximum gpus"]),
     "total_storage_gb": ("nonnegative", ["total storage (gb)", "total storage gb", "total storage", "total storage required (gb)"]),

@@ -4,7 +4,7 @@ This is an implementation interpretation of the supplied internal guide and `Def
 
 ## Supported scope and source mapping
 
-Only Fast Lane applications targeting LUMI-G can produce assessments. Science, Large Scale and Playground remain available for extraction and evidence inspection only.
+Fast Lane and Playground applications targeting LUMI-G can produce shadow assessments. Science and Large Scale remain available for extraction and evidence inspection only. Playground uses reviewer-requested onboarding criteria: a named AMD-capable stack and a concrete trial or exploratory task, without detailed job budgets or measured scaling.
 
 | Check | Implemented behaviour | Source |
 |---|---|---|
@@ -22,7 +22,9 @@ Only Fast Lane applications targeting LUMI-G can produce assessments. Science, L
 | Country | Mandatory manual verification against the applicable eligible-country list, with a reference or justification in the note. No static roster or model inference | Guide p.3 |
 | Classification | Accepted, Rejected (not feasible), or Rejected (out of resources). Eligibility rejection must use not feasible | Guide p.3; Default.md |
 
-Unconfirmed model negatives require reviewer attention and cannot themselves produce blocking findings. Deterministic checks can suggest rejection. Every final classification requires one explicit approval, evidence and rationale. Clearly extracted facts with matching source passages and high-confidence positive technical model answers are automatically prefilled, without being labelled individually reviewer-confirmed. Missing or conflicting facts, negative/uncertain/contradictory/stale model answers and the two manual eligibility checks require individual resolution. The final audit records which inputs were automatically prefilled. Acceptance despite a blocking guideline additionally requires an exception note. This mechanism records the reviewer’s judgment; it does not confer authority to waive eligibility rules.
+Registry 4.3 follows the reviewer's explicit evidence-first policy: missing or insufficient positive technical evidence produces NO (not demonstrated) and a cited explanation. Clear negative answers and evidence-gap negatives are prefilled for one final approval, retaining raw model scores and the distinction between missing support and proven incompatibility. Model failures, unreadable pages, contradictory evidence and missing/conflicting required facts remain exceptions. Eligibility is never inferred by the model. Clear source-backed startup/SME/public-sector declarations and dated EU-country matches can be prefilled; unresolved categories and countries still require verification. Saved older registries keep their original gates.
+
+Every final classification requires explicit approval, evidence and rationale. Acceptance despite remaining blocking findings requires an exception note. The audit records automatic prefills separately from individual confirmations.
 
 Required facts are access mode, target, GPU-hours, maximum GPUs, duration, storage, personal-data declaration, tax number (including verified absence), organisation type and country. Previous LUMI use is optional because an omitted declaration must not be converted into an invented answer. Installation and startup feasibility remain mandatory decisions.
 
@@ -38,6 +40,6 @@ Default.md and the guide use different rejection closing wording. The implementa
 - Use authorised historical reviewer-labelled decisions to measure field extraction, evidence retrieval and decision quality. The supplied proposal samples alone do not establish correct classifications.
 - Verify current country eligibility through the reviewer’s authorised reference. The application remains offline and does not follow links from the guide.
 - Stage and evaluate local model weights before choosing a model or claiming accuracy. Confidence settings remain provisional.
-- Implement separate profiles before enabling Playground, Science or Large Scale assessment. The guide’s monthly 350,000/500,000 GPU-hour criteria for larger profiles have not been applied to Fast Lane.
+- Implement separate profiles before enabling Science or Large Scale assessment. The guide’s monthly 350,000/500,000 GPU-hour criteria for larger profiles have not been applied to Fast Lane.
 
 Saved reviews retain their original policy and registry. Restart the service and upload a proposal again to review it under this profile. Existing confirmations are not silently migrated. Production approval, retention approval and deployment validation remain separate gates.

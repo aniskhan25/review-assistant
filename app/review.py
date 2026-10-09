@@ -7,8 +7,8 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from app.configuration import load_config
-from app.decision import ANSWERS, decide, ManualBackend
+from app.configuration import load_config, review_registry
+from app.decision import ANSWERS, decide, ManualBackend, evidence_first
 from app.extraction import FIELDS, extract_facts, parse_value
 from app.retrieval import retrieve
 from app.rules import evaluate
@@ -30,9 +30,10 @@ def digest(value):
 
 
 def new_review(doc, backend, policy, reviewer):
-    registry = load_config("questions.json")
+    facts = extract_facts(doc)
+    registry = review_registry(facts["access_mode"]["value"])
     state = {"id": uuid.uuid4().hex, "revision": 0, "created_at": timestamp(), "reviewer": reviewer,
-             "document": doc, "facts": extract_facts(doc), "decisions": {},
+             "document": doc, "facts": facts, "decisions": {},
              "registry": registry, "policy": copy.deepcopy(policy), "policy_hash": digest(policy),
              "registry_hash": digest(registry), "final": None, "extraction_resolved": not doc["warnings"]}
     analyze(state, backend)
@@ -41,7 +42,7 @@ def new_review(doc, backend, policy, reviewer):
 
 def analyze(state, backend):
     mode = state["facts"]["access_mode"]["value"]
-    unsupported = mode is not None and mode != "FAST_LANE"
+    unsupported = mode not in {"FAST_LANE", "PLAYGROUND"} or (mode == "PLAYGROUND" and state["registry"].get("profile") != "PLAYGROUND")
     confirmed_facts = {key: {"value": fact["value"], "evidence_ids": fact.get("reviewer_evidence_ids", [])}
                        for key, fact in state["facts"].items() if fact["confirmed"]}
     extracted_facts = {key: {"value": fact["value"], "evidence_ids": fact_evidence(state, fact)}
@@ -67,6 +68,8 @@ def analyze(state, backend):
         decision["contradiction"] = bool(conflict)
         if conflict:
             decision["status"] = "CONTRADICTION"
+        if question.get("evidence_first") and not unsupported and not isinstance(backend, ManualBackend):
+            decision = evidence_first(state, decision)
         state["decisions"][qid] = decision
     refresh(state)
 
@@ -96,7 +99,7 @@ def prepare_review(state):
 
     state["draft_classification"] = None
     state["draft_rationale"] = ""
-    if not any(state["exceptions"].values()) and state["facts"]["access_mode"]["value"] == "FAST_LANE" and state["facts"]["target_machine"]["value"].upper() in {"LUMI-G", "LUMI G"}:
+    if not any(state["exceptions"].values()) and (state["facts"]["access_mode"]["value"] == "FAST_LANE" or state["registry"].get("profile") == "PLAYGROUND") and state["facts"]["target_machine"]["value"].upper() in {"LUMI-G", "LUMI G"}:
         blockers = [f["message"] for f in evaluate(state, state["policy"])["findings"] if f["severity"] == "blocker"]
         classification = "REJECT" if blockers else "ACCEPT"
         rationale = "; ".join(blockers) if blockers else "The reviewed evidence supports technical feasibility within the requested resources and duration."
@@ -194,8 +197,9 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
         raise ValueError("Resolve required facts: " + ", ".join(missing))
     if not state["extraction_resolved"]:
         raise ValueError("Resolve extraction warnings first")
-    if state["facts"]["access_mode"]["value"] != "FAST_LANE":
-        raise ValueError("Only Fast Lane reviews are supported")
+    mode = state["facts"]["access_mode"]["value"]
+    if mode not in {"FAST_LANE", "PLAYGROUND"} or (mode == "PLAYGROUND" and state["registry"].get("profile") != "PLAYGROUND"):
+        raise ValueError("Only Fast Lane and Playground reviews with matching profiles are supported")
     if state["facts"]["target_machine"]["value"].upper() not in {"LUMI-G", "LUMI G"}:
         raise ValueError("Only the LUMI-G target is supported")
     if any(not decision_ready(state, qid, d) for qid, d in state["decisions"].items()):
@@ -233,7 +237,10 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
     citations = {qid: d["reviewer_evidence_ids"] for qid, d in decisions.items()}
     for qid, title in templates["form_questions"].items():
         d = decisions[qid]
-        lines += [title, d["reviewer_answer"], templates[d["reviewer_answer"]][qid]]
+        wording = templates[d["reviewer_answer"]][qid]
+        if d["reviewer_answer"] == "NO" and d.get("status") == "EVIDENCE_NOT_DEMONSTRATED":
+            wording = "The supplied proposal does not demonstrate " + {"software_gpu_capable": "suitability of the named software for the target architecture.", "code_previously_installed": "previous installation or use on LUMI.", "workplan_sufficient": "a feasible plan for the requested allocation."}[qid]
+        lines += [title, d["reviewer_answer"], wording]
         if d.get("aggregation_reason"):
             lines.append("Automated check basis: " + d["aggregation_reason"])
         if d["reviewer_note"]:
@@ -256,7 +263,8 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
             lines.append(templates["personal_data"])
     else:
         for key in dict.fromkeys(rejection_details):
-            lines.append(templates["rejection_details"][key])
+            lines.append("Please describe a concrete onboarding task or small experiment to be performed with the allocation."
+                         if mode == "PLAYGROUND" and key == "workplan" else templates["rejection_details"][key])
         lines.append(templates["rejection_closing"])
     state["rules"] = rules
     state["final"] = {"classification": classification, "classification_label": classification_label,

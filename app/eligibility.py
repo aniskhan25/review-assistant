@@ -23,7 +23,7 @@ def prefill(state, qid, question):
     evidence = retrieve(state['document']['evidence'], question)
     decision = decide(ManualBackend(), qid, question, evidence, state['policy'])
     facts = state['facts']
-    if facts['access_mode']['value'] != 'FAST_LANE' or str(facts['target_machine']['value']).upper() not in {'LUMI-G', 'LUMI G'}:
+    if facts['access_mode']['value'] not in {'FAST_LANE', 'PLAYGROUND'} or str(facts['target_machine']['value']).upper() not in {'LUMI-G', 'LUMI G'}:
         return decision
     field = 'organization_type' if qid == 'organization_eligible' else 'country'
     fact = facts[field]

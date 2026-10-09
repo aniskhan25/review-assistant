@@ -1,5 +1,5 @@
 {
-  "version": "fast-lane-internal-guide-1",
+  "version": "ai-access-evidence-first-2",
   "approved": false,
   "mode": "shadow",
   "gpu_units_per_node": 4,
@@ -46,5 +46,9 @@
     "workplan_sufficient": "internal-guide pp.2,5; review-template",
     "software_gpu_capable": "internal-guide pp.2,4",
     "scaling_strategy_adequate": "internal-guide p.2"
+  },
+  "reviewer_requested_policy": {
+    "date": "2026-10-09",
+    "basis": "Playground is an onboarding assessment; missing positive technical evidence may be answered NO without individual confirmation. Final reviewer approval remains required."
   }
 }

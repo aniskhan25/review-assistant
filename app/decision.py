@@ -200,3 +200,34 @@ def build_backend(kind="manual", endpoint=None, model_path=None, version=None):
     if kind == "masked":
         return MaskedLMBackend(model_path, version)
     raise ValueError("Unsupported backend")
+
+
+def evidence_first(state, decision):
+    """NO means the positive criterion is not demonstrated; preserve raw model scores."""
+    checks = list(decision.get("checks", {}).values()) or [decision]
+    unresolved = next((check["status"] for check in checks
+                       if check["status"] in {"MODEL_ERROR", "MANUAL_REQUIRED", "CHECK_DISAGREEMENT"}), None)
+    if not state["extraction_resolved"]:
+        unresolved = "EXTRACTION_INCOMPLETE"
+    if decision.get("contradiction") or "conflict" in decision.get("aggregation_reason", "").lower():
+        unresolved = "CONTRADICTION"
+    if decision["question_id"] == "workplan_sufficient" and any(
+            state["facts"][key]["status"] != "PRESENT" for key in
+            ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months")):
+        unresolved = "RESOURCE_FACTS_UNRESOLVED"
+    if unresolved:
+        decision.update(answer="UNKNOWN", status=unresolved, band="reviewer required")
+        return decision
+    if decision["answer"] == "UNKNOWN" or decision["confidence"] < state["policy"]["high_confidence"]:
+        decision.update(answer="NO", status="EVIDENCE_NOT_DEMONSTRATED", band="evidence gap", compatibility_unresolved=False)
+        decision["aggregation_reason"] = ("NO means the positive criterion is not demonstrated by the supplied proposal, "
+                                          "not independently proven impossible. "
+                                          + decision.get("aggregation_reason", "The available supporting evidence did not meet the positive-answer threshold."))
+        if not decision["evidence_ids"]:
+            # Record the passages searched, rather than inventing a supporting quote.
+            searched = [e for e in state["document"]["evidence"] if e.get("scope") == "proposal"]
+            decision["evidence_ids"] = [e["id"] for e in searched[:30]]
+            decision["evidence_scope"] = "Proposal passages searched; no relevant supporting passage found."
+    if decision["answer"] == "NO":
+        decision["compatibility_unresolved"] = False
+    return decision

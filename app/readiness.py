@@ -27,7 +27,11 @@ def decision_ready(state, qid, decision):
             return False
     # Lack of prior installation is a setup warning, not a rejection. Clear
     # negative installation answers can be included in the single final approval.
-    resolved_answer = decision["answer"] == "YES" or (qid == "code_previously_installed" and decision["answer"] == "NO")
+    evidence_first = question.get("evidence_first", False)
+    if (evidence_first and decision["status"] == "EVIDENCE_NOT_DEMONSTRATED"
+            and decision["answer"] == "NO" and not decision.get("contradiction")):
+        return bool(decision["evidence_ids"]) and state["extraction_resolved"]
+    resolved_answer = decision["answer"] == "YES" or (evidence_first and decision["answer"] == "NO") or (qid == "code_previously_installed" and decision["answer"] == "NO")
     return ((not question.get("manual_only") or source_rule) and not decision.get("contradiction") and not decision.get("compatibility_unresolved")
             and decision["status"] in {"OK", "AGGREGATED", "SOURCE_RULE_MATCH"} and resolved_answer
             and decision["confidence"] >= state["policy"]["high_confidence"]

@@ -107,7 +107,8 @@ def test_retrieval_and_contradiction_no_auto_reject():
     state = review()
     analyze(state, FakeBackend({"YES": .01, "NO": .98, "UNKNOWN": .01}))
     assert state["decisions"]["software_gpu_capable"]["contradiction"]
-    assert state["rules"]["suggested"] != "REJECT"
+    assert not state["decisions"]["software_gpu_capable"]["ready"]
+    assert any(f["code"] == "software_gpu_capable" and f["severity"] == "attention" for f in state["rules"]["findings"])
     q = state["registry"]["questions"]["software_gpu_capable"]
     assert any("ROCm" in e["text"] for e in retrieve(state["document"]["evidence"], q))
 

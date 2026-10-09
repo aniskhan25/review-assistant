@@ -94,7 +94,7 @@ def test_alternate_country_and_principal_investigator_scope():
     assert facts["access_mode"]["value"] == "PLAYGROUND"
 
 
-@pytest.mark.parametrize("mode", ["PLAYGROUND", "LARGE_SCALE", "AI_SCIENCE"])
+@pytest.mark.parametrize("mode", ["LARGE_SCALE", "AI_SCIENCE"])
 def test_unsupported_profile_never_invokes_fast_lane_model_or_rules(mode):
     class ForbiddenBackend:
         name, version = "forbidden", "test"
