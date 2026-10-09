@@ -30,12 +30,26 @@ def prefill(state, qid, question):
     if not fact_ready(state, fact) or not isinstance(fact['value'], str):
         return decision
     value = fact['value'].strip().casefold()
+    answer = 'YES'
     if qid == 'organization_eligible':
-        if not question.get('source_category_prefill') or value not in CATEGORIES:
+        playground = question.get('organization_reference')
+        if playground:
+            if facts['access_mode']['value'] != 'PLAYGROUND' or not reference_current(playground):
+                return decision
+            if value in playground['eligible_categories']:
+                reason = f"The proposal declares {fact['value']}, an eligible category for Playground access."
+            elif value in playground['ineligible_categories']:
+                answer = 'NO'
+                reason = f"The proposal declares {fact['value']}. Playground targets industrial SMEs and startups; academic and public-sector applicants should use AI for Science and Collaborative EU projects."
+            else:
+                return decision
+            reference = playground
+        elif not question.get('source_category_prefill') or value not in CATEGORIES:
             return decision
-        reference = {'source': state['policy']['rule_sources']['organization_eligible'],
-                     'guidance': state['policy']['guidance_sources']}
-        reason = f"The proposal declares {fact['value']}, which meets the supplied guide's organisation-category rule."
+        else:
+            reference = {'source': state['policy']['rule_sources']['organization_eligible'],
+                         'guidance': state['policy']['guidance_sources']}
+            reason = f"The proposal declares {fact['value']}, which meets the supplied guide's organisation-category rule."
     else:
         reference = question.get('country_reference', {})
         if not reference_current(reference):
@@ -46,7 +60,7 @@ def prefill(state, qid, question):
             return decision
         reason = f"The proposal's declared country, {fact['value']}, is an EU member in the dated reference list; the supplied guide permits EU countries."
     version = hashlib.sha256(json.dumps(reference, sort_keys=True).encode()).hexdigest()
-    decision.update(answer='YES', model_answer='YES', probabilities={}, confidence=1., margin=1.,
+    decision.update(answer=answer, model_answer=answer, probabilities={}, confidence=1., margin=1.,
                     status='SOURCE_RULE_MATCH', band='source-backed prefill', model='source-guidance-rule',
                     model_version=version, inference_mode='source_rule', evidence_ids=fact_evidence(state, fact),
                     reference=reference, reference_reason=reason)

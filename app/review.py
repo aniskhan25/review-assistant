@@ -89,6 +89,8 @@ def assessment_comment(state, qid, decision, templates):
     }.get(qid, "The proposal does not demonstrate that this requirement is met."))
     if answer != "NO" or (decision["confirmed"] and answer != decision["answer"]):
         return default
+    if qid == "organization_eligible" and decision.get("inference_mode") == "source_rule":
+        return decision["reference_reason"]
     checks = decision.get("checks", {})
     if qid == "software_gpu_capable":
         if checks.get("cuda_only_required", {}).get("answer") == "YES":

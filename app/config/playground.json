@@ -46,6 +46,35 @@
     }
   },
   "organization_eligible": {
-    "title": "Is the lead organisation category eligible under the supplied AI access guidance?"
+    "title": "Is the lead organisation category eligible for Playground access?",
+    "version": "1.2",
+    "instructions": "Use the declared lead category, including the description supplied under Other, and the dated official Playground reference. Startups and SMEs qualify; academia and public-sector users should use AI for Science. Unclassified or conflicting categories require verification. Never infer a legal category from an organisation name.",
+    "criteria": {
+      "YES": "The lead organisation explicitly declares a startup or SME category.",
+      "NO": "The lead organisation explicitly declares an academic or public-sector category directed to AI for Science.",
+      "UNKNOWN": "The declared category is ambiguous, conflicting, or not covered by the recorded rule."
+    },
+    "organization_reference": {
+      "source": "https://www.eurohpc-ju.europa.eu/playground-access-ai-factories_en",
+      "checked": "2026-10-09",
+      "expires": "2027-10-09",
+      "basis": "Official Playground page: industry users, European SMEs/startups; academia and public sector should target AI for Science and Collaborative EU projects.",
+      "eligible_categories": [
+        "startup",
+        "start-up",
+        "sme",
+        "small and medium enterprise (sme)"
+      ],
+      "ineligible_categories": [
+        "university",
+        "higher education institution",
+        "higher education institution / university",
+        "higher education institution/university",
+        "academic institution",
+        "public sector",
+        "public-sector institution",
+        "public sector institution"
+      ]
+    }
   }
 }

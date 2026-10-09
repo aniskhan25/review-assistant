@@ -44,6 +44,8 @@ POLICY_MODES = {
     "eurohpc-ju-call-proposals-ai-science-and-collaborative-eu-projects_en": "AI_SCIENCE",
 }
 
+OTHER_ORGANIZATION_LABELS = ["other: specify the organization type", "other: specify the organisation type"]
+
 ORGANIZATION_FIELDS = {"organization_type", "country", "vat_number"}
 MISSING_MARKERS = {"not provided", "not specified", "unknown"}
 FIELD_BOUNDARIES = {alias for _, aliases in FIELDS.values() for alias in aliases} | {
@@ -174,6 +176,14 @@ def extract_facts(doc):
                 continue
             for raw, source_text in field_matches(region["text"], aliases, multiline=field == "listed_codes"):
                 matches.append(candidate(field, raw, region["page"], source_text))
+        if field == "organization_type" and any(m["value"] and m["value"].casefold() == "other" for m in matches):
+            details = [candidate(field, raw, region["page"], source, "specified_other_category")
+                       for region in regions if region["scope"] not in {"team", "assessment", "allocation_history"}
+                       for raw, source in field_matches(region["text"], OTHER_ORGANIZATION_LABELS)]
+            if details:
+                matches = [m for m in matches if not (m["value"] and m["value"].casefold() == "other")] + details
+                for detail in details:
+                    detail["source"]["declared_category"] = "Other"
         if not matches:
             matches = list(supplemental_matches(field, [r for r in regions if r["scope"] == "proposal"]))
         if not matches:
