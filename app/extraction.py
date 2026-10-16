@@ -10,7 +10,7 @@ FIELDS = {
     "target_machine": ("text", ["target machine", "target system", "ai factory selection", "partition name"]),
     "project_duration_months": ("positive", ["project duration (months)", "project duration months", "project duration"]),
     "organization_type": ("text", ["organization type", "organisation type"]),
-    "country": ("text", ["country", "organization country", "organisation country", "organization country - horizon 2020", "organisation country - horizon 2020"]),
+    "country": ("text", ["country", "country - horizon 2020", "organization country", "organisation country", "organization country - horizon 2020", "organisation country - horizon 2020"]),
     "vat_number": ("text", ["vat number", "vat", "organization vat number", "organisation vat number", "company vat number", "company tax number"]),
     "requested_gpu_hours": ("positive", ["requested amount of resources (gpu hours)", "requested gpu hours", "gpu hours"]),
     "maximum_number_of_gpus": ("integer", ["maximum number of gpus", "maximum gpus"]),
@@ -55,7 +55,13 @@ FIELD_BOUNDARIES = {alias for _, aliases in FIELDS.values() for alias in aliases
 }
 
 
-def field_matches(text, aliases, multiline=False):
+def normalize_country(raw):
+    # A form's programme label is not part of its declared country. Preserve
+    # the original passage in provenance; this does not establish eligibility.
+    return re.sub(r"^Horizon\s+2020\s*:\s*", "", raw.strip(), flags=re.I).strip()
+
+
+def field_matches(text, aliases, multiline=False, country_value=False):
     # Whitespace may wrap inside long labels; values can follow a colon on the next line.
     labels = "|".join(r"\s+".join(re.escape(word) for word in alias.split())
                       for alias in sorted(aliases, key=len, reverse=True))
@@ -68,7 +74,7 @@ def field_matches(text, aliases, multiline=False):
             if following:
                 candidate = following.group(1).strip()
                 # Do not consume a subsequent label or repeated section heading as a value.
-                if (":" not in candidate and candidate.lower() not in FIELD_BOUNDARIES
+                if ((":" not in candidate or (country_value and re.match(r"^Horizon\s+2020\s*:", candidate, re.I))) and candidate.lower() not in FIELD_BOUNDARIES
                         and not re.fullmatch(r"\d+/\d+", candidate)):
                     raw = candidate
                     end += following.end()
@@ -87,6 +93,8 @@ def field_matches(text, aliases, multiline=False):
 
 def candidate(field, raw, page, source_text, method="form_field"):
     source = {"page": page, "field": field, "text": source_text, "method": method}
+    if field == "country":
+        raw = normalize_country(raw)
     try:
         if raw.lower() in MISSING_MARKERS:
             value, status = None, "NOT_FOUND"
@@ -137,6 +145,8 @@ def supplemental_matches(field, regions):
 def parse_value(field, raw):
     kind = FIELDS[field][0]
     raw = raw.strip()
+    if field == "country":
+        raw = normalize_country(raw)
     if not raw:
         raise ValueError("Empty value")
     if kind == "boolean":
@@ -174,7 +184,7 @@ def extract_facts(doc):
         for region in regions:
             if field in ORGANIZATION_FIELDS and region["scope"] == "team":
                 continue
-            for raw, source_text in field_matches(region["text"], aliases, multiline=field == "listed_codes"):
+            for raw, source_text in field_matches(region["text"], aliases, multiline=field == "listed_codes", country_value=field == "country"):
                 matches.append(candidate(field, raw, region["page"], source_text))
         if field == "organization_type" and any(m["value"] and m["value"].casefold() == "other" for m in matches):
             details = [candidate(field, raw, region["page"], source, "specified_other_category")

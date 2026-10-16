@@ -13,8 +13,9 @@ from app.extraction import FIELDS, extract_facts, parse_value
 from app.retrieval import retrieve
 from app.rules import evaluate
 from app.semantic_checks import assess
-from app.readiness import fact_evidence, fact_ready, decision_ready
-from app.eligibility import prefill as eligibility_prefill
+from app.readiness import fact_evidence, fact_ready, decision_ready, review_reasons
+from app.eligibility import prefill as eligibility_prefill, reference_current
+from app.workload import assess_workload, input_hash, reason_options, compose_reason
 
 REQUIRED_FACTS = ("access_mode", "target_machine", "requested_gpu_hours", "maximum_number_of_gpus",
                   "project_duration_months", "total_storage_gb", "personal_data_declared", "vat_number",
@@ -50,7 +51,7 @@ def analyze(state, backend):
     context = "Reviewer-verified structured facts:\n" + json.dumps(confirmed_facts) if confirmed_facts else ""
     context += "\nAutomatically extracted proposal facts (untrusted evidence, not reviewer verified):\n" + json.dumps(extracted_facts)
     for qid, question in state["registry"]["questions"].items():
-        evidence = retrieve(state["document"]["evidence"], question)
+        evidence = retrieve(state["document"]["evidence"], question, limit=question.get("retrieval_limit", 5))
         if not unsupported and (question.get("source_category_prefill") or question.get("country_reference")):
             decision = eligibility_prefill(state, qid, question)
         elif question.get("checks") and not unsupported and not isinstance(backend, ManualBackend):
@@ -75,6 +76,7 @@ def analyze(state, backend):
         if question.get("evidence_first") and not unsupported and not isinstance(backend, ManualBackend):
             decision = evidence_first(state, decision)
         state["decisions"][qid] = decision
+    state["workload"] = assess_workload(state, backend, context)
     refresh(state)
 
 
@@ -91,8 +93,14 @@ def assessment_comment(state, qid, decision, templates):
         "country_eligible": "The lead organisation's country does not meet the eligibility criteria.",
         "official_rocm_builds_available": "The proposal does not establish availability of suitable AMD/ROCm builds for the required dependencies.",
     }.get(qid, "The proposal does not demonstrate that this requirement is met."))
+    if qid == "fast_lane_validated" and answer == "NO":
+        return ("The proposal does not document completed testing of this workload on LUMI or on a relevant AMD/ROCm system. "
+                "This decision concerns readiness for Fast Lane, rather than the project's merit or the feasibility of its workplan. "
+                "Please apply through Playground first to port and validate the workload, then submit a renewed Fast Lane application with the test results.")
     if answer != "NO" or (decision["confirmed"] and answer != decision["answer"]):
         return default
+    if qid == "official_rocm_builds_available" and state["registry"]["questions"][qid]["version"] == "4.6":
+        return "The proposed core GPU workflow has an explicit compatibility restriction and no credible supported LUMI-G execution path is established. Please address the restriction or provide a supported alternative."
     if qid == "organization_eligible" and decision.get("inference_mode") == "source_rule":
         return decision["reference_reason"]
     checks = decision.get("checks", {})
@@ -110,12 +118,28 @@ def assessment_comment(state, qid, decision, templates):
             return "The proposal does not describe a concrete onboarding task or small experiment. Feasibility within the requested allocation cannot be assessed."
     return default
 
+def capacity_reason(finding):
+    values = finding['calculation']
+    maximum = values['maximum_number_of_gpus'] * 24 * 30 * values['project_duration_months']
+    return (f"The requested {values['requested_gpu_hours']:,.0f} GPU-hours exceed the theoretical maximum "
+            f"of {maximum:,.0f} GPU-hours for the stated concurrency and duration, assuming 30-day months "
+            "and continuous use with consistent GPU accounting units. Please revise the resource request or execution plan.")
+
+
 def prepare_review(state):
+    workload = state.get("workload")
+    state.pop("workload_comment", None)
+    state["workload_reason_options"] = []
+    if workload:
+        workload["stale"] = (workload["input_hash"] != input_hash(state) or
+                             not all(reference_current(r) for r in workload["references"]))
+        state["workload_reason_options"] = reason_options(workload)
     state["rules"] = evaluate(state, state["policy"])
     for fact in state["facts"].values():
         fact["ready"] = fact_ready(state, fact)
     for qid, decision in state["decisions"].items():
         decision["ready"] = decision_ready(state, qid, decision)
+        decision["review_reasons"] = review_reasons(state, qid, decision)
     state["exceptions"] = {
         "facts": [key for key in REQUIRED_FACTS if not state["facts"][key]["ready"]],
         "decisions": [qid for qid, d in state["decisions"].items() if not d["ready"]],
@@ -128,15 +152,30 @@ def prepare_review(state):
         for qid, title in templates["form_questions"].items()
         for d in [state["decisions"][qid]])
 
+    state["draft_global_comment"] = ""
     state["draft_classification"] = None
     state["draft_rationale"] = ""
     if not any(state["exceptions"].values()) and (state["facts"]["access_mode"]["value"] == "FAST_LANE" or state["registry"].get("profile") == "PLAYGROUND") and state["facts"]["target_machine"]["value"].upper() in {"LUMI-G", "LUMI G"}:
         blockers = [assessment_comment(state, f["code"], state["decisions"][f["code"]], templates)
-                    if f["code"] in state["decisions"] else f["message"]
+                    if f["code"] in state["decisions"] else capacity_reason(f) if f["code"] == "resource_consumption" else f["message"]
                     for f in state["rules"]["findings"] if f["severity"] == "blocker"]
         classification = "REJECT" if blockers else "ACCEPT"
-        rationale = " ".join(dict.fromkeys(blockers)) if blockers else "The reviewed evidence supports technical feasibility within the requested resources and duration."
-        preview = finalize(copy.deepcopy(state), classification, rationale, True)
+        included = [option for option in state["workload_reason_options"]
+                    if option["classification"] == classification]
+        # Remove only known duplicate boilerplate; retain specific findings and rules.
+        redundant = set()
+        if any(f["code"] == "resource_consumption" and f["severity"] == "blocker"
+               for f in state["rules"]["findings"]):
+            redundant.add("The requested GPU-hours cannot be consumed within the declared duration, even at continuous maximum concurrency.")
+        if any(option["id"] == "technical_fit" for option in included):
+            redundant.add("The proposal does not establish availability of suitable AMD/ROCm builds for the required dependencies.")
+        paragraphs = list(dict.fromkeys(text for text in blockers if text not in redundant))
+        workload_reason = compose_reason(included, classification)
+        if workload_reason:
+            paragraphs.insert(0, workload_reason)
+        rationale = "\n\n".join(paragraphs) if paragraphs else "The reviewed evidence supports technical feasibility within the requested resources and duration."
+        preview = finalize(copy.deepcopy(state), classification, rationale, True,
+                           global_comment=state["draft_global_comment"])
         state["draft"] = "PREVIEW — awaiting your final approval\n\n" + preview["text"]
         state["draft_classification"] = classification
         state["draft_rationale"] = rationale
@@ -262,6 +301,8 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
     if "resource_capacity" in rejection_details and not any(f["code"] == "resource_consumption" for f in blockers):
         raise ValueError("Capacity rejection wording requires a failed resource-capacity check")
     eligibility_codes = {"vat", "organization_eligibility", "organization_eligible", "country_eligible"}
+    if classification == "REJECT" and rejection_category != "NOT_FEASIBLE" and any(f["code"] == "fast_lane_validated" for f in blockers):
+        raise ValueError("Fast Lane readiness rejections must use the not-feasible category, not out of resources")
     if classification == "REJECT" and rejection_category != "NOT_FEASIBLE" and any(f["code"] in eligibility_codes for f in blockers):
         raise ValueError("Eligibility rejections must use the not-feasible category")
     classification_label = "Accepted" if classification == "ACCEPT" else (

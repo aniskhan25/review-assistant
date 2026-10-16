@@ -1,48 +1,23 @@
-# Narrow checks behind the submission form
+# Technical checks behind the submission form
 
-Registry 4.2 preserves the three submission questions and their output wording. Nine evidence checks support these answers; scaling and official-build availability remain separate, and eligibility can use clear source-backed category and EU-member rules. Up to twelve model calls are used, including a prior-use consistency check; literal source claims can bypass some calls.
+Registry 4.5 preserves three submission answers: software suitability, prior installation and workplan feasibility. Fast Lane uses nine supporting evidence checks plus separate scaling/build questions and a prior-use consistency check. Source-backed literal claims can bypass model calls. Playground uses simpler onboarding criteria and omits separate scaling/build verification and the material compatibility blocker.
 
-| Submission answer | Internal checks | Combination |
-|---|---|---|
-| Architecture suitability | Named dependencies; AMD execution path; CUDA-only requirement; material compatibility blocker | A positive material blocker or the original architecture failure checks yields NO. The retained dependency and AMD-path checks support the draft YES; an unresolved additional compatibility check still requires reviewer verification. A resolved compatibility check contributes to the combined confidence. Otherwise UNKNOWN. Repeated explicit deferral of critical component version pinning is a source-backed blocker; routine porting does not by itself. Unresolved compatibility remains UNKNOWN. Weak negative checks cannot override into a reliable combined NO. |
-| Code installed | Prior LUMI use of the workflow/equivalent environment; future installation or porting | Prior use supports YES. Pending installation or a finding that prior use is not demonstrated supports NO. Conflicting prior-use and pending-installation statements, or opposite answers under corroborating prior-use interpretations, remain UNKNOWN. Extensions in an already validated environment are distinguished from first installation. NO is a setup risk, not rejection by itself. |
-| Workplan feasibility | Concrete targets; meaningful workload sizing; credible execution plan | Impossible capacity or a material negative check yields NO. Concrete targets, meaningful sizing and a positive execution assessment support YES without requiring a separate startup timetable. Unresolved sizing remains UNKNOWN. Otherwise UNKNOWN. |
+| Submission answer | Evidence and combination |
+|---|---|
+| Software suitability | Named dependencies and a plausible AMD path support YES. An explicit CUDA-only requirement or material unsupported dependency can yield NO. Planned porting with named AMD alternatives is distinct from an unsupported dependency; unresolved compatibility remains an exception. |
+| Prior installation | Prior LUMI execution of the workflow or equivalent environment supports YES. Pending first installation or no demonstrated prior use supports NO, which is a setup warning. Conflicting prior-use interpretations remain unresolved. |
+| Workplan feasibility | Fast Lane checks concrete goals, meaningful workload sizing and a credible execution plan. Playground requires a concrete onboarding trial. Impossible capacity can yield NO using cited resource facts independently of model confidence. |
 
-These are proposed review interpretations derived from development reviews, not independently approved policy. They classify supplied evidence rather than independently verifying package compatibility. NO for missing installation evidence means “not demonstrated,” not “incompatible.” UNKNOWN is reserved for evidence that cannot support a reliable assessment; it is not automatically interchangeable with a negative finding.
+Jevos and MLX score binary evidence questions with YES/NO options; the AMD-path check uses three options and cited generic framework references. These references do not verify application versions or installation. Raw option scores are uncalibrated. Combined confidence is the minimum supporting confidence, not a probability that the complete review is correct.
 
-Jevos and the local MLX scorer evaluate eight evidence checks through binary YES/NO scoring (`noul` for Jevos, masked option logits for MLX). Its score is mapped to YES and NO; UNKNOWN is produced by the existing confidence/margin policy or absent evidence, not by inventing a third model probability. The AMD-path check uses three options and cited generic framework references; these references do not verify exact application versions or installation. Other adapters retain their own scoring interfaces. Saved registry 3.0 reviews retain their original choice-scoring behavior.
+Retrieval restricts technical checks to relevant proposal sections. Previous-allocation evidence is permitted for prior-use checks; historical reviewer answers never enter inference. Proposal text and extracted facts remain untrusted evidence.
 
-The technical checks with section restrictions constrain retrieval to their relevant proposal sections, preventing ethics/privacy boilerplate from displacing technical evidence. Previous-allocation evidence is allowed only for the prior-use check. Retrieved text and structured facts remain untrusted evidence; historical review answers never enter inference.
+An empty required evidence search can produce a cited NO (not demonstrated). Classifier uncertainty is not treated as absent evidence: modest positive scores stay positive but require review. Model failures, conflicting interpretations, unresolved extraction, accounting assumptions and missing required facts remain exceptions. Clear negative technical answers can be prefilled for the single final approval; prior installation NO alone does not reject a proposal.
 
-The interface shows each internal result, score, status and source IDs, together with the aggregation reason. Combined scores are the minimum supporting scores, not calibrated probabilities of correctness. Confidence and margin thresholds are unchanged. Clear high-confidence installation NO answers are setup-warning prefills. Other negative recommendations, contradictions, low-confidence results and accounting assumptions still require review. Reviewers resolve the submission answer without confirming every internal check. Final output and audit records retain the reasoning and aggregation version.
+Organisation and country eligibility use source-backed rules or reviewer verification, never model guesses. Playground's dated organisation reference permits SMEs/startups and identifies academic/public-sector applicants for the AI for Science route. The country reference covers EU members and Norway; uncovered countries, expired references and conflicts require verification. See [review rubric](review-rubric.md).
+
+The interface exposes individual check results, evidence and combination reasons. Reviews snapshot their registry, including legacy aggregation behavior; rerunning suggestions does not migrate it. Reupload for current extraction and criteria.
 
 ## Validation
 
-Run the deterministic aggregation, retrieval and workflow tests with `python3 -m pytest -q`. Historical evaluation uses the actual aggregation pipeline:
-
-```sh
-python3 -m app.historical_evaluation evaluation/private/RUN/gold-candidates.jsonl \
-  --endpoint http://127.0.0.1:8019/v1/systemone --split development \
-  --model-version MODEL_FINGERPRINT --output evaluation/private/RUN/revised.json
-```
-
-Use a local service with `JEV_API_KEY` in its environment. Do not put secrets in command arguments or proposal data in Git. Keep held-out proposals untouched during development. See [evaluation documentation](../evaluation/README.md).
-
-`evaluation/datasets/narrow-checks.jsonl` contains synthetic examples with proposed labels for registry 4.2. These are not human-labelled historical checks or model quality evidence. The earlier registry 3.0 synthetic result (8/12) does not apply to these revised examples. The historical registry 3.0 baseline matched 6/48 submission answers, gave one incorrect answer and abstained on 41, motivating the revised criteria. Baseline and revised reports remain private.
-
-New uploads receive registry 4.2 and aggregation version 3. Saved reviews retain their original registry and aggregation semantics, including the stricter registry 3.0 rules; rerunning does not silently migrate them. Upload a proposal again to use the revised checks. The app remains in shadow mode with final human approval.
-
-The final development comparison reused unchanged model questions, probability outputs and retrieved evidence from the baseline and native-scoring runs. Registry 4.1 aggregation produced 19 matching answers, four incorrect answers and 25 abstentions across 48 submission answers, compared with 6/1/41 for registry 3.0. Final aggregation was checked by deterministic replay, not a fresh full 16-case run. Architecture retained its baseline draft results; installation matched 9/16 with three disagreements; workplan matched 4/16 with no non-abstaining disagreements. No submission answer met all automatic-readiness criteria. These development results improve draft coverage, not autonomous review reliability.
-
-The local 4B scorer and revised source checks resolved more development answers. Across 48 submission answers, the final replay matched 32, disagreed on 3, and returned UNKNOWN on 13, compared with 19/4/25 for the previous Jevos workflow. Eight revised check scores were measured afresh on all sixteen development proposals; unchanged scores and a corroborating prior-use interpretation were verified against the real MLX baseline. Final aggregation also applied deterministic source-claim guards. This is not a fresh full candidate run or held-out validation, and it does not evaluate final classification. A separate live PDF smoke run verifies application integration.
-
-
-## Registry 4.3: onboarding and evidence-first decisions
-
-New uploads use registry 4.3; earlier reviews retain their snapshots. Fast Lane retains its detailed checks. Playground omits independent scaling/build-verification questions and the material-version-deferral check, and replaces detailed workplan sizing with one concrete onboarding/experiment check. Named core dependencies and an AMD execution path remain essential. Prior installation NO is a setup warning for both profiles.
-
-At the reviewer's request, missing or insufficient positive technical evidence produces NO with a "not demonstrated" explanation and can be included in the single final approval. Model UNKNOWN or scores below the positive prefill threshold are treated as insufficient positive evidence; raw scores/checks remain unchanged. This is a conservative decision policy, not proof that the project is impossible or evidence of better model accuracy. Retrieval with no relevant passage records the proposal passages searched. Unreadable pages, model failures, conflicting interpretations, missing resource facts and unresolved manual eligibility stay exceptions. No model guesses missing VAT or legal eligibility.
-
-The Playground profile uses common resource arithmetic, VAT, storage, personal-data and source-backed organisation/country checks from the supplied AI access guidance; it adds no unverified Playground resource ceilings. It remains a shadow assessment with explicit final approval. Reupload an existing proposal to use this profile.
-
-Playground organisation question 1.2 now uses the declared Other-category description and a dated official Playground reference. Source-declared SMEs/startups can receive YES; academic and public-sector categories receive NO with the AI for Science route explained. This reference overrides the generic internal-guide category rule for new Playground reviews. Unknown or conflicting categories and expired references remain unresolved. Source-backed NO is ready for final approval without individual confirmation. Existing reviews retain their registry snapshots.
+Run `python -m pytest -q` for extraction, aggregation and workflow regressions. The [evaluation guide](../evaluation/README.md) documents synthetic checks, private historical evaluation and model comparisons. `evaluation/datasets/narrow-checks.jsonl` contains synthetic proposed labels originating with registry 4.2; it is not a held-out quality benchmark. Dated development reports record the policy used and must not be read as validation of later registries.

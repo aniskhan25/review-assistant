@@ -6,7 +6,7 @@ import re
 
 MAX_BYTES = 20 * 1024 * 1024
 MAX_TEXT = 1_000_000
-EXTRACTOR_VERSION = "embedded-fields-6"
+EXTRACTOR_VERSION = "embedded-fields-7"
 
 
 def form_regions(pages):

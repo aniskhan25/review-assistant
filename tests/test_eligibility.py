@@ -98,3 +98,63 @@ def test_playground_reference_overrides_generic_public_sector_rule():
         q['organization_reference']['expires'] = '2020-01-01'
         assert not decision_ready(state, 'organization_eligible', d)
         assert prefill(state, 'organization_eligible', q)['answer'] == 'UNKNOWN'
+
+
+def test_horizon_country_prefix_matches_verified_norway_reference():
+    from app.ingestion import document
+    from app.extraction import extract_facts
+    from tests.helpers import TEXT
+    for field in ('Country: Horizon 2020: Norway',
+                  'Country:\nHorizon 2020: Norway',
+                  'Organisation Country - Horizon 2020: Norway',
+                  'Country - Horizon 2020: Norway'):
+        text = TEXT.replace('Country: Finland', field)
+        fact = extract_facts(document([{'page': 1, 'text': text}]))['country']
+        assert fact['value'] == 'Norway' and fact['status'] == 'PRESENT'
+        assert field in fact['source']['text']
+        state = review(text)
+        assert state['facts']['country']['ready']
+        d = state['decisions']['country_eligible']
+        assert d['status'] == 'SOURCE_RULE_MATCH' and d['answer'] == 'YES'
+        assert d['reference']['source'] == 'https://lumi-ai-factory.eu/pricing-and-eligibility/'
+        assert 'EU member' not in d['reference_reason']
+
+
+def test_horizon_country_prefix_keeps_conflicts_and_party_boundaries():
+    from app.ingestion import document
+    from app.extraction import extract_facts
+    for extra, expected in (('\nCountry: Norway', 'PRESENT'),
+                            ('\nCountry: Sweden', 'CONFLICT'),
+                            ('\nTeam Members #1\nCountry: Sweden', 'PRESENT')):
+        fact = extract_facts(document([{'page': 1, 'text': 'Country: Horizon 2020: Norway' + extra}]))['country']
+        assert fact['status'] == expected
+    for value in ('Unknown', 'Not provided'):
+        fact = extract_facts(document([{'page': 1, 'text': 'Country: Horizon 2020: '+value}]))['country']
+        assert fact['status'] == 'NOT_FOUND' and fact['value'] is None
+
+
+def test_prefixed_eu_country_can_still_match_existing_reference():
+    from tests.helpers import TEXT
+    state = review(TEXT.replace('Country: Finland', 'Country: Horizon 2020: Finland'))
+    d = state['decisions']['country_eligible']
+    assert d['answer'] == 'YES' and d['inference_mode'] == 'source_rule'
+
+
+def test_norway_reference_applies_to_both_modes_and_preserves_guards():
+    from tests.helpers import TEXT
+    for mode in ('Fast Lane', 'Playground'):
+        state = review(TEXT.replace('Fast Lane', mode).replace('Country: Finland', 'Country: Horizon 2020: Norway'))
+        q = state['registry']['questions']['country_eligible']
+        assert prefill(state, 'country_eligible', q)['answer'] == 'YES'
+        q['country_reference']['expires'] = '2020-01-01'
+        assert prefill(state, 'country_eligible', q)['answer'] == 'UNKNOWN'
+        q['country_reference']['expires'] = '2099-01-01'
+        state['facts']['country']['status'] = 'CONFLICT'
+        assert prefill(state, 'country_eligible', q)['answer'] == 'UNKNOWN'
+
+
+def test_saved_subset_does_not_silently_gain_norway():
+    state = configured()
+    state['facts']['country']['value'] = 'Norway'
+    q = state['registry']['questions']['country_eligible']
+    assert prefill(state, 'country_eligible', q)['answer'] == 'UNKNOWN'

@@ -34,7 +34,7 @@ is never disabled. The runtime does not execute model-supplied Python code.
 Stop the previous service on the same port, then:
 
 ```sh
-models/decision-4b/.venv/bin/python -m app.local_mlx --reviewer anisrahm --port 8766
+models/decision-4b/.venv/bin/python -m app.local_mlx --reviewer your-reviewer-id --port 8766
 ```
 
 The launcher hashes every manifest file again before starting. It records the
@@ -48,4 +48,4 @@ Saved reviews retain their original registry; upload again for current extractio
 or re-run suggestions to use the selected model with the saved review's criteria.
 Re-running clears previous model-answer confirmations. Clear high-confidence installation
 NO answers can be prefilled as setup warnings; clear negative technical answers can also be prefilled. Uncertain answers require
-review. Clear organisation categories and EU-member countries can be prefilled from source-backed rules; uncertain and uncovered eligibility conditions remain manual. Final approval remains explicit.
+review. Clear organisation categories and countries in the verified subset (EU members and Norway) can be prefilled from source-backed rules; uncertain and uncovered eligibility conditions remain manual. Final approval remains explicit.

@@ -9,7 +9,7 @@ def evaluate(state, policy):
 
     def add(code, severity, message, calculation=None):
         findings.append({"code": code, "severity": severity, "message": message,
-                         "calculation": calculation or {}, "source_ref": policy.get("rule_sources", {}).get(code)})
+                         "calculation": calculation or {}, "source_ref": state["registry"]["questions"].get(code, {}).get("rule_source") or policy.get("rule_sources", {}).get(code)})
 
     def value(key):
         fact = facts[key]

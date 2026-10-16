@@ -1,16 +1,16 @@
 # Local Jevos on Apple Silicon
 
-The project now has a working Jevos-v4 CPU setup. Jevos is an open-source Jev-style decision model, not the proprietary TypeSafe Jev service. It runs entirely on this Mac after staging. Uploading a PDF now runs twelve narrow technical model calls and combines them into the submission answers; extraction, arithmetic and template composition remain deterministic. Organisation and country eligibility still require manual verification. The workflow now focuses on exceptions: clear facts and high-confidence positive model answers are prefilled; uncertain or negative answers and eligibility checks require resolution. One final approval covers the draft and automatic prefills.
+Jevos-v4 is an optional CPU backend, separate from the working Qwen/MLX setup. It runs locally after staging and scores bounded technical questions; extraction, resource arithmetic, source-backed eligibility and assessment composition remain deterministic. Current profiles, readiness rules and verification limits are described in the [root README](../README.md).
 
 ## Start
 
 From the project root, using Python 3.11 or later with the project dependencies installed:
 
 ```sh
-python3 -m app.local_jev --reviewer anisrahm --port 8766 --model-port 8018
+python3 -m app.local_jev --reviewer your-reviewer-id --port 8766 --model-port 8018
 ```
 
-Open `http://127.0.0.1:8766` and unlock with `data/reviewer.key`. These alternate ports avoid the previously running manual instance on 8765. The defaults are 8765 for the app and 8017 for the model if both ports are free. The launcher refuses occupied ports rather than stopping an existing service.
+Open `http://127.0.0.1:8766` and unlock with `data/reviewer.key`. Stop any app already using port 8766 before launching this alternative. The defaults are 8765 for the app and 8017 for the model if both ports are free. The launcher refuses occupied ports rather than stopping an existing service.
 
 Keep the launch terminal open. Ctrl-C stops both children. The launcher waits for model readiness, compares the model server's fingerprint with the local files, creates an ephemeral authentication key for the model service, and disables model state caching. If the model dies, it stops the app. An explicitly requested backend that cannot initialize no longer silently switches to manual mode. Request-time inference errors remain visible as MODEL_ERROR/UNKNOWN.
 

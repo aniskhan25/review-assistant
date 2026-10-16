@@ -1,5 +1,9 @@
 # Offline evaluation
 
+Run the opt-in Fast Lane readiness regressions against the staged Qwen model with
+`RUN_LOCAL_QWEN_TESTS=1 models/decision-4b/.venv/bin/python -m unittest tests.test_fast_lane_model -v`.
+These synthetic development cases distinguish completed AMD testing from NVIDIA/Intel Gaudi results and future ROCm plans, and preserve qualifying local, LUMI and Try and Buy tests. They are regression checks, not a claim of general model accuracy. The normal test suite skips these Metal-dependent tests.
+
 `datasets/synthetic.jsonl` contains 20 synthetic scenarios for pipeline smoke tests. They include explicit ROCm, CUDA-only, prior installation, missing fields, ambiguous values, independent job arrays, distributed execution and prompt-injection text. They are not historical reviews or a representative model-selection dataset. All belong to a synthetic `heldout` partition only so the default runner can exercise the full corpus.
 
 Curate a private JSONL file with one record per reviewed proposal:
@@ -35,7 +39,7 @@ Proposed promotion gates: top-5 evidence recall ≥95%, high-confidence accuracy
 
 The private output contains an inventory, source fingerprints, candidate Fast Lane labels, separately retained other profiles, an issue report, and unlabelled narrow-check curation rows for development proposals. Review descriptions remain separate from proposal pages. Overall acceptance never becomes an inferred YES for every technical check. Groups use explicit cross-references and applicant filename matches; split assignments are provisional until related-project checks are complete. Pass all previously inspected/tuned examples via `--exposed` to keep their groups in development. Do not use Git for the generated source data.
 
-For registries 3.0, 4.1 and 4.2, use the actual aggregation benchmark rather than the legacy broad-question runner:
+For reviews with aggregated technical checks, use the actual aggregation benchmark rather than the legacy broad-question runner:
 
 ```sh
 python -m app.historical_evaluation evaluation/private/RUN/gold-candidates.jsonl \
@@ -79,3 +83,7 @@ models/kev-benchmark/.venv/bin/python -m tools.compare_corrected_models \
 ```
 
 The summary refuses to overwrite an existing result. Development selection remains separate from production qualification and fresh held-out validation. This experiment does not tune either model to the exposed evaluation labels.
+
+## Recorded experiments
+
+The dated Markdown reports in `reports/` retain historical comparison evidence and explain why Qwen remains the working backend. Their registry versions and metrics describe those runs only. Generated JSON reports are ignored; rerun the synthetic smoke command in the root README for the current code. `tools/summarize_local_benchmark.py DIRECTORY` summarizes the original three-candidate held-out report format; `tools/compare_corrected_models.py` evaluates the corrected-workflow experiment. Both formats remain supported for reproducibility.

@@ -37,3 +37,40 @@ def decision_ready(state, qid, decision):
             and decision["confidence"] >= state["policy"]["high_confidence"]
             and decision["margin"] >= state["policy"]["minimum_margin"]
             and bool(decision["evidence_ids"]) and state["extraction_resolved"])
+
+
+def review_reasons(state, qid, decision):
+    """Explain existing gates without changing confidence or approval policy."""
+    if decision_ready(state, qid, decision):
+        return []
+    reasons = []
+    statuses = {
+        'MODEL_ERROR': 'Model inference failed; check the evidence and record an answer.',
+        'STALE_FACTS': 'Facts or evidence changed; rerun suggestions or verify the answer.',
+        'NO_EVIDENCE_FOUND': 'No relevant supporting passage was retrieved.',
+        'MANUAL_REQUIRED': 'This check requires reviewer verification.',
+        'UNSUPPORTED_PROFILE': 'This access profile is not supported for this check.',
+        'CHECK_DISAGREEMENT': 'Supporting interpretations disagree.',
+        'ACCOUNTING_ASSUMPTION_REVIEW': 'GPU accounting assumptions need verification.',
+    }
+    if decision['status'] in statuses:
+        reasons.append(statuses[decision['status']])
+    if not state['extraction_resolved']:
+        reasons.append('Document extraction is not resolved.')
+    if decision.get('contradiction'):
+        reasons.append('The evidence and suggested answer conflict.')
+    if decision.get('compatibility_unresolved'):
+        reasons.append('A material compatibility check remains unresolved.')
+    if decision['answer'] == 'UNKNOWN':
+        reasons.append('The model did not establish YES or NO; this does not prove incompatibility.')
+    policy = state['policy']
+    if decision.get('confidence', 0) < policy['high_confidence']:
+        reasons.append(f"The supporting score ({decision.get('confidence', 0):.0%}) is below the automatic-prefill threshold ({policy['high_confidence']:.0%}).")
+    if decision.get('margin', 0) < policy['minimum_margin']:
+        reasons.append('The score difference between answers is below the automatic-prefill threshold.')
+    weak = [d.get('check_title', key) for key, d in decision.get('checks', {}).items()
+            if d.get('status') != 'OK' or d.get('answer') == 'UNKNOWN'
+            or d.get('confidence', 0) < policy['high_confidence'] or d.get('margin', 0) < policy['minimum_margin']]
+    if weak:
+        reasons.append('Inspect supporting checks: ' + '; '.join(weak) + '.')
+    return reasons or ['Verify the evidence and applicable reference before confirming this answer.']

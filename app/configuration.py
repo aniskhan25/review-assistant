@@ -33,11 +33,12 @@ def load_policy(path=None):
 def review_registry(mode):
     registry = load_config("questions.json")
     registry["profile"] = mode
+    registry["workload"] = load_config("workload.json")
     if mode != "PLAYGROUND":
         return registry
     questions = registry["questions"]
     registry["questions"] = {key: value for key, value in questions.items()
-                             if key not in {"scaling_strategy_adequate", "official_rocm_builds_available"}}
+                             if key not in {"scaling_strategy_adequate", "official_rocm_builds_available", "fast_lane_validated"}}
     registry["questions"]["software_gpu_capable"]["checks"].pop("compatibility_blocker")
     registry["questions"]["code_previously_installed"]["checks"]["prior_lumi_run"].pop("corroborating_question", None)
     for key, override in load_config("playground.json").items():

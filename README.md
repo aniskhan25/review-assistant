@@ -2,17 +2,19 @@
 
 A local, evidence-assisted Fast Lane and Playground/LUMI-G review application. PDF parsing, lexical retrieval, structured facts, deterministic checks, reviewer confirmations, assessment templates, SQLite audit records and offline evaluation are implemented. The interface works without a model.
 
-**The default is a shadow prototype, not an approved production reviewer.** Sample proposals, an internal guide and a review template have been supplied and used to refine the workflow. Historical reviewer-labelled decisions, policy sign-off, model weights and deployment hardware remain outstanding. The bundled 20 cases are explicitly synthetic. Jevos-v4 is staged and operationally tested on this Mac as the initial model candidate; it has not been qualified for production accuracy.
+The app defaults to shadow mode with mandatory final human approval. Qwen3-4B through MLX is the locally validated working backend; manual mode and alternative adapters remain available. Development comparisons are not production qualification. See [current status and remaining gates](docs/implementation-status.md).
 
-## Run with the local Jev model
+## Run with the local Qwen model
 
-The staged Apple Silicon setup starts both the model and review app with:
+Use the staged Qwen3-4B model through the Apple Silicon MLX runtime:
 
 ```sh
-python3 -m app.local_jev --reviewer anisrahm --port 8766 --model-port 8018
+models/decision-4b/.venv/bin/python -m app.local_mlx --reviewer your-reviewer-id --port 8766
 ```
 
-Open **http://127.0.0.1:8766**, unlock with `data/reviewer.key`, and upload a PDF. The three submission answers are assembled from narrow evidence checks; scaling and official-build checks also run through Jevos-v4; the two eligibility questions remain manual. See [local Jevos setup](deploy/jev-local.md) for artifact hashes, lifecycle and validation limits.
+Open **http://127.0.0.1:8766**, unlock with `data/reviewer.key`, and check that the banner says **Backend: mlx-option-4b**. See [local Qwen/MLX setup](deploy/mlx-local.md) for artifact verification and validation limits. Jevos is a different backend; its alternative launcher is documented in [local Jevos setup](deploy/jev-local.md). Starting `app.server` without a backend selects manual review and does not run Qwen.
+
+Saved reviews keep their previous model results until you explicitly **Re-run suggestions (clears confirmations)**. After switching backends, use that action to recompute suggestions with Qwen under the saved review's criteria, or upload again for current extraction and criteria. Re-running clears prior confirmations and approval; it does not merely refresh the screen.
 
 ## Manual mode and dependencies
 
@@ -30,11 +32,13 @@ For a non-confidential walkthrough, upload `evaluation/datasets/sample.pdf`, a g
 
 1. Upload a PDF. Original bytes are processed in memory and not saved.
 2. Resolve highlighted fact gaps. Clear extracted values with matching page evidence are prefilled automatically; missing, malformed and contradictory values remain exceptions. All values stay inspectable and editable.
-3. Resolve decision exceptions. High-confidence positive model answers carry forward automatically. Negative recommendations, uncertain or conflicting answers, model errors and manual eligibility checks need review. A changed answer or corrected fact requires a note.
+3. Resolve decision exceptions. High-confidence positive model answers carry forward automatically. Uncertain or conflicting answers, model errors and unmatched eligibility checks need review; clear negative answers can be prefilled for final approval. A changed answer or corrected fact requires a note.
 4. Inspect resource calculations and warnings. Explicitly choose acceptance or a rejection category and write a rationale. Acceptance despite blocking guidance also requires an evidence-based exception note.
 5. Give one final approval covering the draft, its prefilled facts and answers, then download the assessment. Shadow outputs are visibly marked **not for submission**.
 
 Fact changes and newly added evidence invalidate both automatic answers and decision confirmations; any edit invalidates the final export. Re-running inference also clears confirmations. Reviews survive restarts. Unreadable/scanned pages require reviewer transcription and explicit resolution; automatic OCR is not included.
+
+The review summary links directly to unresolved facts, answers, extraction checks, and the assessment. Saving one form preserves unsaved edits in other forms in this tab's memory. These edits are not saved across a browser reload or lock; navigation warns before discarding them. Save fact, answer, and evidence edits before final approval. Any unsaved edit disables assessment download. After a stale-revision conflict, use **Reload latest and keep my edits**, reconcile the retained input with the updated evidence, and save again. Refreshing the review clears the approval checkbox. Requests are serialized, while **Lock workspace** remains available; locking does not cancel an operation already received by the server.
 
 The extractor supports consolidated EuroHPC forms, including wrapped labels/values, `AI Factory Selection`, organisation VAT/country, storage/transfer questions and the personal-data declaration. Lead organisation fields are kept separate from team-member organisations, even across page breaks. Appended technical assessment forms cannot supply proposal facts or supporting evidence. Framework/backend fields can identify literal names in the listed software; this does not imply compatibility. Explicit missing markers remain unknown. Previous EuroHPC allocation and previous LUMI use are separate facts.
 
@@ -46,7 +50,7 @@ After updating the parser or review policy, restart the service and upload the P
 
 ## Local models
 
-The review application and local launcher never download weights and includes no hosted inference backend. All adapters normalize a full YES/NO/UNKNOWN probability distribution and apply the same confidence/margin policy. Missing evidence bypasses inference. Invalid responses or model failures return UNKNOWN, leaving manual review usable.
+The review application and local launchers never download weights and include no hosted inference backend. All adapters normalize a full YES/NO/UNKNOWN probability distribution and apply the same confidence/margin policy. Missing evidence bypasses inference. Invalid responses or model failures return UNKNOWN, leaving manual review usable.
 
 **CPU jevos:** stage its reviewed binary and weights separately, start its local server with an explicit model directory and no state cache, then:
 
@@ -74,7 +78,7 @@ python -m app.server --reviewer your-id --backend masked \
   --model-path /approved/models/baseline --model-version YOUR_ARTIFACT_SHA256
 ```
 
-The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a review covers seven top-level decisions, including two eligibility checks resolved from source-backed rules where possible. Registry 4.3 retains nine Fast Lane internal checks behind the three submission answers, plus scaling/build questions and a prior-use consistency check (up to twelve model calls; literal source claims can bypass calls). See [narrow review checks](docs/narrow-review-checks.md). There is no GPU batching scheduler.
+The baseline loads with `local_files_only=True` and `trust_remote_code=False`, scores single-token A/B/C options, and refuses oversized context. Scores are raw softmax probabilities, not calibrated correctness. OpenJev and masked-model execution are serialized; the small service processes one request at a time. `/v1/decide` handles one registered question per call; a Fast Lane review covers eight top-level decisions, including two eligibility checks resolved from source-backed rules where possible. The current registry retains nine Fast Lane internal checks behind the three submission answers, plus scaling/build questions and a prior-use consistency check (up to twelve model calls; literal source claims can bypass calls). See [narrow review checks](docs/narrow-review-checks.md). There is no GPU batching scheduler.
 
 ## Configuration and policy
 
@@ -82,9 +86,9 @@ The baseline loads with `local_files_only=True` and `trust_remote_code=False`, s
 
 The supplied internal guide sets four full MI250X modules per node (two GCDs per module) and a storage warning above 50,000 GB. Storage alone does not trigger rejection. See the [derived review rubric](docs/review-rubric.md) for sources, interpretations and unresolved approval gates. The capacity calculation uses exactly the plan's 24 × 30 hour convention and cannot promise scheduler availability.
 
-Final assessments support `FAST_LANE` and `PLAYGROUND` on `LUMI-G`. Installation alone is a warning. Independent concurrent jobs are valid scaling. Clear high-confidence negative installation answers are prefilled as setup warnings. New uploads use an evidence-first policy: insufficient supporting evidence produces NO (not demonstrated) rather than an evidence-gap UNKNOWN. Negative answers can be prefilled for final approval; installation NO remains only a setup warning. Raw model scores are preserved. Extraction failures, model errors, contradictory evidence, missing required facts and unresolved legal eligibility still need resolution. Deterministic impossible capacity can suggest rejection, but **every final classification still needs reviewer confirmation**.
+Final assessments support `FAST_LANE` and `PLAYGROUND` on `LUMI-G`. Installation alone is a warning. Independent concurrent jobs are valid scaling. Clear high-confidence negative installation answers are prefilled as setup warnings. New uploads use an evidence-first policy: an empty required evidence search can produce NO (not demonstrated). Model uncertainty is not converted into missing evidence; modest positive scores remain positive but require review. Negative answers can be prefilled for final approval; installation NO remains only a setup warning. Raw model scores are preserved. Extraction failures, model errors, contradictory evidence, missing required facts and unresolved legal eligibility still need resolution. Deterministic impossible capacity can suggest rejection, but **every final classification still needs reviewer confirmation**.
 
-The export follows the template’s three form questions, global comments and classification. Internal checks also cover scaling, official ROCm builds, organisation and country eligibility. Clear declared startup/SME/public-sector categories and EU-member countries can be prefilled using the guide and a dated reference subset. Large-enterprise conditions, other countries and uncertain declarations still need manual verification and a note. The EU reference expires on 2027-10-09; it does not cover all affiliated countries. Accepted personal-data projects receive the template’s DPA paragraph and a visible CCR follow-up task. No notifications or enrolments are sent by the app. Previous LUMI use remains optional; installation and startup feasibility must still be reviewed.
+The export follows the template’s three form questions, global comments and classification. Internal checks also cover scaling, official ROCm builds, organisation and country eligibility. Clear declared startup/SME/public-sector categories and countries in the verified subset (EU members and Norway) can be prefilled using the guide and a dated reference subset. Large-enterprise conditions, other countries and uncertain declarations still need manual verification and a note. The country reference expires on 2027-10-13; it does not cover all affiliated countries. Accepted personal-data projects receive the template’s DPA paragraph and a visible CCR follow-up task. No notifications or enrolments are sent by the app. Previous LUMI use remains optional; installation and startup feasibility must still be reviewed.
 
 Production mode requires `approved: true` and complete thresholds. That configuration gate is an administrator attestation, not evidence that benchmark or organizational approval has occurred. Complete the remaining gates in [implementation status](docs/implementation-status.md) before enabling it.
 
@@ -92,8 +96,9 @@ Production mode requires `approved: true` and complete thresholds. That configur
 
 ```sh
 python -m pytest -q
+node --test tests/frontend.test.cjs
 python -m app.evaluation evaluation/datasets/synthetic.jsonl \
-  --output evaluation/reports/synthetic-baseline.json
+  --output evaluation/reports/synthetic-smoke.json
 ```
 
 Tests cover a real generated PDF through final composition, malformed/ambiguous extraction, confidence and margin handling, contradiction referrals, deterministic rule branches, confirmation gates, API access controls, redirects, optimistic revisions, audit retention and an offline workflow. HTTP integration tests need loopback networking.
@@ -134,4 +139,25 @@ All API requests use `Authorization: Bearer <reviewer key>`. Mutation JSON inclu
 
 The adapters were implemented against the public [jevos wire interface](https://github.com/feder-cr/jev) and [OpenJev-4B inference interface](https://github.com/ejhshen/OpenJev/blob/main/docs/INFERENCE.md). The [lookski/OpenJev implementation](https://github.com/lookski/openjev) is another optional SystemOne-compatible candidate; its hosted backends are not used here. Pin and review upstream source, licenses and model artifacts before staging. Protocol tests use local fixtures; Jevos-v4 has now been tested with real staged weights on Apple Silicon. The MLX option scorer has been evaluated with real local weights on sixteen development proposals; reports distinguish it from Jevos. Other adapters remain unverified with real weights.
 
-New uploads receive registry 4.3. Saved reviews retain their original registry; reupload to use the Playground profile and evidence-first policy. This change is a reviewer-requested decision policy, not model retraining or a measured accuracy improvement.
+Country extraction removes the form prefix `Horizon 2020:` from declared country values while preserving the original passage as evidence. This is a parsing correction, not an eligibility decision. The automatic country reference covers EU members and Norway, verified against [LUMI AI Factory eligibility](https://lumi-ai-factory.eu/pricing-and-eligibility/). Countries outside this subset still require reviewer verification against the applicable list. Eligibility cards explain this reference check separately from model inference. Saved reviews retain their original extraction and country-reference snapshot. Reupload to use the updated extractor and registry 4.5, or record a manual country decision with its reference in an existing review.
+
+## AI workload assessment
+
+New reviews include an advisory workload panel alongside the existing decision checks. It shows verbatim proposal excerpts for the task/method, model scale, data, memory/precision, experiments/runtime and intended outputs; missing matches remain explicitly unidentified. These excerpts are a navigation aid, not verified structured facts or inferred memory/runtime estimates.
+
+Three additional bounded model calls assess technical fit, resource fit and plan credibility. Fast Lane expects a sizing rationale and executable plan; Playground accepts a bounded learning experiment. Findings distinguish plausible plans, potential material concerns and clarification needs. Model failures or unavailable references are shown separately. This adds inference time and does not change the existing automatic recommendation, exception count or approval gates.
+
+The panel uses dated official LUMI hardware, container and AI-environment references from `app/config/workload.json`, snapshotted with each new review. The reference is general guidance, not a complete service catalogue or certification of an application's versions. The app stays offline; maintainers must verify and update references when they expire.
+
+Workload evidence IDs, diagnostic labels and model uncertainty stay in the reviewer panel. Diagnostic labels and evidence IDs are never copied into applicant-facing wording. Plain-language fit findings matching the suggested classification are included in the draft Reason for classification by default, subject to your final review. The **Reason for classification** is the standalone explanation sent to the applicant by email; global technical comments are visible in the portal. The app combines applicable fit findings into one paragraph with a single clarification request, keeping numerical capacity constraints separate. There are no fit toggles; correct or remove any inaccurate wording directly in the editable reason before approval. Acceptance wording requires ACCEPT; concern wording requires REJECT. No uncertain finding automatically changes classification. The app prepares classification text only; email generation belongs to the EuroHPC JU portal. Replace generic wording with the specific confirmed problem when needed.
+
+Saved approved wording is preserved. For reviews containing diagnostics copied by earlier versions, **Remove previous internal workload text from comments** removes those generated lines from the editable field while retaining other comments. Review and approve again to change the saved export. Capacity-related draft rejection reasons include the resource figures, assumptions and requested correction.
+
+The AI workload assessment appears above extracted facts and has a direct navigation link. Fact/evidence changes invalidate the advisory findings; previous findings remain visible with an Out of date label, and rerunning suggestions refreshes them. If you already copied findings into comments, revise that text after any evidence change. Existing reviews retain their original registry and will not silently acquire the new assessment: restart the service and reupload to use it. The workload configuration has its own version (1.0); technical aggregation remains unchanged.
+
+
+Registry 4.6 separates a documented supported LUMI-G software environment from complete application/version validation. Explicit LUMI-supported PyTorch/ROCm containers with a credible ROCm path can support YES; a generic framework name alone cannot. Routine package installation and onboarding are not proof of incompatibility. The check retrieves technical sections and preserves UNKNOWN when evidence is unresolved. Workload classifier uncertainty remains internal and is not automatically described as missing information in classification reasons; an empty evidence search is handled separately. Saved reviews keep their original question; reupload after restarting to use the revised check.
+
+Registry 4.7 adds a Fast Lane readiness check under the [reviewer-defined routing policy](docs/review-rubric.md): relevant completed Try and Buy testing, LUMI execution or local AMD/ROCm results can each establish initial validation. A supported container or a feasible workplan alone does not establish this readiness. A resolved negative directs the applicant to Playground for initial porting/testing and explains that distinction in the classification reason. Playground has no such prerequisite. Restart and reupload to apply the new criteria; rerunning an older saved review preserves its snapshot.
+
+Decision cards now display the confirmed reviewer answer without the obsolete "reviewer required" label. Unconfirmed answers explain the applicable uncertainty, conflict, missing evidence or score threshold. Positive suggestions still use the existing confidence policy; thresholds have not been relaxed. Model scores identify which answer they support, including UNKNOWN.

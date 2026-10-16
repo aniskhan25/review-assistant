@@ -56,9 +56,9 @@ def prefill(state, qid, question):
             return decision
         value = reference.get('aliases', {}).get(value, value)
         if value not in {country.casefold() for country in reference.get('countries', [])}:
-            # This subset covers EU members only; affiliated countries need verification.
+            # Absence from this verified subset does not establish ineligibility.
             return decision
-        reason = f"The proposal's declared country, {fact['value']}, is an EU member in the dated reference list; the supplied guide permits EU countries."
+        reason = f"The proposal's declared country, {fact['value']}, matches the dated eligible-country reference subset for LUMI access."
     version = hashlib.sha256(json.dumps(reference, sort_keys=True).encode()).hexdigest()
     decision.update(answer=answer, model_answer=answer, probabilities={}, confidence=1., margin=1.,
                     status='SOURCE_RULE_MATCH', band='source-backed prefill', model='source-guidance-rule',

@@ -117,7 +117,8 @@ def test_impossible_capacity_still_explains_rejection_without_a_plan():
     text = missing_text().replace('Requested GPU hours: 50000', 'Requested GPU hours: 99999999')
     state = playground(NoSupport(), text)
     assert 'exceed the maximum' in state['draft']
-    assert 'cannot be consumed within the declared duration' in state['draft_rationale']
+    assert '99,999,999 GPU-hours exceed the theoretical maximum of 92,160 GPU-hours' in state['draft_rationale']
+    assert 'cannot be consumed within the declared duration' not in state['draft_rationale']
 
 
 def test_final_approval_preserves_reviewer_rationale_and_notes():

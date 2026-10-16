@@ -11,5 +11,4 @@ wheelhouse/
 .env
 evaluation/private/
 evaluation/reports/*.json
-!evaluation/reports/synthetic-baseline.json
 .DS_Store

@@ -30,7 +30,7 @@ def test_single_final_approval_uses_prefills_without_faking_confirmations():
     assert not state["decisions"]["workplan_sufficient"]["confirmed"]
     result = finalize(state, "ACCEPT", state["draft_rationale"], True)
     assert len(result["automatic_facts"]) == 10
-    assert len(result["automatic_decisions"]) == 5
+    assert len(result["automatic_decisions"]) == 6
     assert all(result["fact_citations"].values())
     assert not state["decisions"]["workplan_sufficient"]["confirmed"]
 
@@ -71,7 +71,7 @@ def test_edits_invalidate_automatic_answers(edit):
     else:
         add_evidence(state, 1, "The plan includes extra installation work.", "Checked PDF")
     assert state["final"] is None
-    assert len(state["exceptions"]["decisions"]) == 7
+    assert len(state["exceptions"]["decisions"]) == 8
 
 
 def test_extracted_facts_reach_model_without_being_called_verified():

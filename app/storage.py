@@ -76,6 +76,10 @@ class Store:
                                                "note": fact.get("reviewer_note"),
                                                "evidence_ids": fact.get("reviewer_evidence_ids")}
                                          for key, fact in state["facts"].items()},
+                  "workload": {"version": (state.get("workload") or {}).get("version"),
+                               "input_hash": (state.get("workload") or {}).get("input_hash"),
+                               "stale": (state.get("workload") or {}).get("stale"),
+                               "decisions": {f["id"]: f["decision"] for f in (state.get("workload") or {}).get("findings", [])}},
                   "final_classification": state["final"]["classification"] if state["final"] else None,
                   "final_rationale": state["final"]["rationale"] if state["final"] else None}
         if state["final"]:
