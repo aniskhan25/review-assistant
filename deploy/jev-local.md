@@ -1,6 +1,6 @@
 # Local Jevos on Apple Silicon
 
-Jevos-v4 is an optional CPU backend, separate from the working Qwen/MLX setup. It runs locally after staging and scores bounded technical questions; extraction, resource arithmetic, source-backed eligibility and assessment composition remain deterministic. Current profiles, readiness rules and verification limits are described in the [root README](../README.md).
+Jevos-v4 is an optional CPU backend, separate from the working Qwen/MLX setup. It runs locally after staging and scores bounded technical questions; extraction, resource arithmetic, source-backed eligibility and assessment composition remain deterministic. Current profiles, readiness rules and verification limits are described in the [review guide](../docs/review-guide.md).
 
 ## Start
 
