@@ -2,6 +2,7 @@
 from datetime import date
 import hashlib
 import json
+import re
 
 from app.decision import ManualBackend, decide
 from app.readiness import fact_evidence, fact_ready
@@ -9,6 +10,13 @@ from app.retrieval import retrieve
 
 CATEGORIES = {'startup', 'start-up', 'sme', 'small and medium enterprise (sme)',
               'public sector', 'public-sector institution', 'public sector institution'}
+
+
+def self_employed_category(value):
+    category = re.sub(r'\s*\([^()]*\)\s*$', '', value.strip().casefold())
+    category = re.sub(r'[\s‐‑–—-]+', ' ', category).strip()
+    return category in {'self employed', 'self employed consultant', 'self employed professional',
+                        'sole proprietor', 'sole proprietorship', 'sole trader'}
 
 
 def reference_current(reference, today=None):
@@ -31,9 +39,19 @@ def prefill(state, qid, question):
         return decision
     value = fact['value'].strip().casefold()
     answer = 'YES'
+    evidence_ids = fact_evidence(state, fact)
     if qid == 'organization_eligible':
         playground = question.get('organization_reference')
-        if playground:
+        if self_employed_category(value):
+            reference = question.get('self_employment_reference', {})
+            tax = facts['vat_number']
+            if (not reference_current(reference) or not fact_ready(state, tax)
+                    or not isinstance(tax['value'], str) or not tax['value'].strip()):
+                return decision
+            reason = ("The lead declares a self-employed business or sole proprietorship and supplies a VAT/tax identifier. "
+                      "This meets the recorded reviewer rule for this organisation category; the identifier has not been independently validated.")
+            evidence_ids = list(dict.fromkeys(evidence_ids + fact_evidence(state, tax)))
+        elif playground:
             if facts['access_mode']['value'] != 'PLAYGROUND' or not reference_current(playground):
                 return decision
             if value in playground['eligible_categories']:
@@ -58,10 +76,10 @@ def prefill(state, qid, question):
         if value not in {country.casefold() for country in reference.get('countries', [])}:
             # Absence from this verified subset does not establish ineligibility.
             return decision
-        reason = f"The proposal's declared country, {fact['value']}, matches the dated eligible-country reference subset for LUMI access."
+        reason = f"The proposal's declared country, {fact['value']}, matches the dated eligible-country reference list for LUMI access."
     version = hashlib.sha256(json.dumps(reference, sort_keys=True).encode()).hexdigest()
     decision.update(answer=answer, model_answer=answer, probabilities={}, confidence=1., margin=1.,
                     status='SOURCE_RULE_MATCH', band='source-backed prefill', model='source-guidance-rule',
-                    model_version=version, inference_mode='source_rule', evidence_ids=fact_evidence(state, fact),
+                    model_version=version, inference_mode='source_rule', evidence_ids=evidence_ids,
                     reference=reference, reference_reason=reason)
     return decision

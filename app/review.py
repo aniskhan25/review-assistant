@@ -12,10 +12,11 @@ from app.decision import ANSWERS, decide, ManualBackend, evidence_first
 from app.extraction import FIELDS, extract_facts, parse_value
 from app.retrieval import retrieve
 from app.rules import evaluate
-from app.semantic_checks import assess
+from app.semantic_checks import assess, refresh_obsolete_capacity_answer
 from app.readiness import fact_evidence, fact_ready, decision_ready, review_reasons
 from app.eligibility import prefill as eligibility_prefill, reference_current
 from app.workload import assess_workload, input_hash, reason_options, compose_reason
+from app.aitta import current as writing_current, FORM_IDS
 
 REQUIRED_FACTS = ("access_mode", "target_machine", "requested_gpu_hours", "maximum_number_of_gpus",
                   "project_duration_months", "total_storage_gb", "personal_data_declared", "vat_number",
@@ -120,13 +121,19 @@ def assessment_comment(state, qid, decision, templates):
 
 def capacity_reason(finding):
     values = finding['calculation']
-    maximum = values['maximum_number_of_gpus'] * 24 * 30 * values['project_duration_months']
+    maximum = values['maximum_gpu_hours']
     return (f"The requested {values['requested_gpu_hours']:,.0f} GPU-hours exceed the theoretical maximum "
             f"of {maximum:,.0f} GPU-hours for the stated concurrency and duration, assuming 30-day months "
             "and continuous use with consistent GPU accounting units. Please revise the resource request or execution plan.")
 
 
 def prepare_review(state):
+    refresh_obsolete_capacity_answer(state)
+    writing = state.get('writing_draft')
+    if writing:
+        writing['stale'] = not writing_current(state)
+    state['draft_form_comments'] = ({k: v['text'] for k, v in writing['comments'].items()}
+                                    if writing and not writing['stale'] else {})
     workload = state.get("workload")
     state.pop("workload_comment", None)
     state["workload_reason_options"] = []
@@ -174,7 +181,13 @@ def prepare_review(state):
         if workload_reason:
             paragraphs.insert(0, workload_reason)
         rationale = "\n\n".join(paragraphs) if paragraphs else "The reviewed evidence supports technical feasibility within the requested resources and duration."
-        preview = finalize(copy.deepcopy(state), classification, rationale, True,
+        if writing and not writing['stale'] and writing['classification'] == classification:
+            rationale = writing['rationale']['text']
+            state['draft_global_comment'] = writing['global_comment']['text']
+        preview_state = copy.deepcopy(state)
+        if writing and writing['stale']:
+            preview_state.pop('writing_draft', None)
+        preview = finalize(preview_state, classification, rationale, True,
                            global_comment=state["draft_global_comment"])
         state["draft"] = "PREVIEW — awaiting your final approval\n\n" + preview["text"]
         state["draft_classification"] = classification
@@ -258,7 +271,17 @@ def add_evidence(state, page, text, note):
 
 
 def finalize(state, classification, rationale, acknowledge_findings, rejection_category="NOT_FEASIBLE",
-             global_comment="", rejection_details=None, exception_note=""):
+             global_comment="", rejection_details=None, exception_note="", form_comments=None):
+    writing = state.get('writing_draft')
+    if writing and (not writing_current(state) or writing['classification'] != classification):
+        raise ValueError('The generated review is out of date or uses another classification. Regenerate it or return to standard wording.')
+    if form_comments is None:
+        form_comments = {k: v['text'] for k, v in writing['comments'].items()} if writing else {}
+    if not isinstance(form_comments, dict) or (form_comments and set(form_comments) != set(FORM_IDS)):
+        raise ValueError('Provide all three review comments, or use standard wording.')
+    form_comments = {k: text_input(v, 'assessment comment', 2000) for k, v in form_comments.items()}
+    if any(not v for v in form_comments.values()):
+        raise ValueError('Assessment comments cannot be empty.')
     if classification not in {"ACCEPT", "REJECT"}:
         raise ValueError("Choose ACCEPT or REJECT explicitly")
     rationale = text_input(rationale, "final rationale", 4000)
@@ -311,7 +334,7 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
     citations = {qid: d["reviewer_evidence_ids"] for qid, d in decisions.items()}
     for qid, title in templates["form_questions"].items():
         d = decisions[qid]
-        lines += [title, d["reviewer_answer"], assessment_comment(state, qid, d, templates)]
+        lines += [title, d["reviewer_answer"], form_comments.get(qid) or assessment_comment(state, qid, d, templates)]
         if d["reviewer_note"]:
             lines.append(d["reviewer_note"])
         lines.append("")
@@ -321,8 +344,12 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
     capacity = next(f for f in rules["findings"] if f["code"] == "resource_consumption")
     calculation = capacity["calculation"]
     if capacity["severity"] == "blocker":
-        maximum = calculation["maximum_number_of_gpus"] * 24 * 30 * calculation["project_duration_months"]
+        maximum = calculation["maximum_gpu_hours"]
         lines.append(f"The requested {calculation['requested_gpu_hours']:,.0f} GPU-hours exceed the maximum of {maximum:,.0f} GPU-hours within the declared duration, even at continuous maximum concurrency.")
+    elif writing and global_comment:
+        pass  # The reviewed generated paragraph already discusses the resource findings.
+    elif capacity['severity'] == 'attention':
+        lines.append("The stated GPU or node limit does not establish total project concurrency. Independent jobs may run concurrently. Please clarify the maximum simultaneous resource use across all jobs and justify the allocation with expected job counts and runtimes.")
     elif decisions["workplan_sufficient"]["reviewer_answer"] == "NO":
         lines.append("The information provided is insufficient to assess the workload or justify the requested GPU allocation.")
     else:
@@ -353,4 +380,14 @@ def finalize(state, classification, rationale, acknowledge_findings, rejection_c
                       "automatic_facts": [k for k in REQUIRED_FACTS if not state["facts"][k]["confirmed"]],
                       "automatic_decisions": [k for k, d in state["decisions"].items() if not d["confirmed"]],
                       "fact_citations": {k: fact_evidence(state, state["facts"][k]) for k in REQUIRED_FACTS}}
+    state['final']['form_comments'] = form_comments
+    if writing:
+        state['final']['drafting'] = {key: copy.deepcopy(writing[key]) for key in
+            ('provider', 'model', 'prompt_version', 'input_hash', 'generated_at', 'issues')}
+        state['final']['drafting']['privacy_version'] = writing.get('privacy_version')
+        state['final']['drafting']['assessment'] = copy.deepcopy(writing.get('assessment'))
+        state['final']['drafting']['outbound_preview_hash'] = writing.get('outbound_preview_hash')
+        state['final']['drafting']['evidence'] = {
+            **{k: v['evidence_ids'] for k, v in writing['comments'].items()},
+            'global_comment': writing['global_comment']['evidence_ids'], 'rationale': writing['rationale']['evidence_ids']}
     return state["final"]

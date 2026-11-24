@@ -2,7 +2,7 @@
 
 Run the opt-in Fast Lane readiness regressions against the staged Qwen model with
 `RUN_LOCAL_QWEN_TESTS=1 models/decision-4b/.venv/bin/python -m unittest tests.test_fast_lane_model -v`.
-These synthetic development cases distinguish completed AMD testing from NVIDIA/Intel Gaudi results and future ROCm plans, and preserve qualifying local, LUMI and Try and Buy tests. They are regression checks, not a claim of general model accuracy. The normal test suite skips these Metal-dependent tests.
+For prior-installation interpretation regressions, run the same command with `tests.test_prior_lumi_model`. These synthetic development cases distinguish completed AMD testing from NVIDIA/Intel Gaudi results and future ROCm plans, and preserve qualifying local, LUMI and Try and Buy tests. They are regression checks, not a claim of general model accuracy. The normal test suite skips these Metal-dependent tests.
 
 `datasets/synthetic.jsonl` contains 20 synthetic scenarios for pipeline smoke tests. They include explicit ROCm, CUDA-only, prior installation, missing fields, ambiguous values, independent job arrays, distributed execution and prompt-injection text. They are not historical reviews or a representative model-selection dataset. All belong to a synthetic `heldout` partition only so the default runner can exercise the full corpus.
 

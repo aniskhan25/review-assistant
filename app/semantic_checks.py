@@ -2,9 +2,33 @@
 
 import copy
 
+from app.capacity import resource_capacity
 from app.decision import decide
 from app.retrieval import retrieve
 from app.source_claims import source_claim, claim_decision, claim_evidence
+
+
+def refresh_obsolete_capacity_answer(state):
+    """Recombine cached checks when an old per-job ceiling supplied the answer."""
+    decision = state['decisions'].get('workplan_sufficient', {})
+    if (state.get('final') or decision.get('confirmed') or not decision.get('checks')
+            or decision.get('status') == 'STALE_FACTS'
+            or decision.get('aggregation_reason') != 'Requested GPU-hours exceed continuous maximum capacity within the project duration.'
+            or resource_capacity(state)['severity'] == 'blocker'):
+        return
+    answer, reason, used = combine('workplan_sufficient', decision['checks'], state)
+    checks = [decision['checks'][key] for key in used]
+    confidence = min((d.get('confidence', 0) for d in checks), default=0)
+    decision['previous_capacity_assessment'] = {
+        key: copy.deepcopy(decision.get(key)) for key in
+        ('answer', 'model_answer', 'aggregation_reason', 'confidence', 'evidence_ids')}
+    decision.update(answer=answer, model_answer=answer, aggregation_reason=reason,
+                    confidence=confidence,
+                    margin=min((d.get('margin', 0) for d in checks), default=0),
+                    evidence_ids=list(dict.fromkeys(eid for d in checks for eid in d['evidence_ids'])),
+                    status='AGGREGATED' if answer != 'UNKNOWN' else 'CHECKS_UNRESOLVED',
+                    band='high' if answer != 'UNKNOWN' and confidence >= state['policy']['high_confidence'] else 'reviewer required',
+                    capacity_rule_version='2')
 
 
 def assess(state, backend, qid, question, context):
@@ -12,14 +36,14 @@ def assess(state, backend, qid, question, context):
     for key, specification in question["checks"].items():
         check = dict(question, **specification)
         check.pop("checks", None)
-        evidence = retrieve(state["document"]["evidence"], check)
+        evidence = retrieve(state["document"]["evidence"], check, limit=check.get('retrieval_limit', 5))
         claim = source_claim(check, claim_evidence(check, state["document"]["evidence"], evidence))
         checks[key] = claim_decision(key, check, claim) if claim else decide(backend, key, check, evidence, state["policy"], context)
         if check.get("corroborating_question") and checks[key]["answer"] in {"YES", "NO"}:
             secondary = dict(check, **check["corroborating_question"])
             secondary.pop("corroborating_question", None)
             corroboration = decide(backend, key + "-corroboration", secondary,
-                                   retrieve(state["document"]["evidence"], secondary), state["policy"], context)
+                                   retrieve(state["document"]["evidence"], secondary, limit=secondary.get('retrieval_limit', 5)), state["policy"], context)
             checks[key] = resolve_corroboration(checks[key], corroboration)
         checks[key]["check_title"] = check["title"]
     answer, reason, used = combine(qid, checks, state)
@@ -30,7 +54,7 @@ def assess(state, backend, qid, question, context):
     if capacity_failure:
         from app.readiness import fact_evidence
         sources = list(dict.fromkeys(eid for key in
-            ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months")
+            resource_capacity(state)["calculation"]["evidence_fields"]
             for eid in fact_evidence(state, state["facts"][key])))
         confidence = margin = 1.
     return {"question_id": qid, "question_version": question["version"],
@@ -54,6 +78,8 @@ def resolve_corroboration(primary, secondary):
     if (primary["status"] == secondary["status"] == "OK"
             and {primary["answer"], secondary["answer"]} == {"YES", "NO"}):
         result.update(answer="UNKNOWN", status="CHECK_DISAGREEMENT", band="reviewer required")
+    elif primary['answer'] == 'YES' and (secondary['status'] != 'OK' or secondary['answer'] != 'YES'):
+        result.update(answer='UNKNOWN', status='CHECKS_UNRESOLVED', band='reviewer required')
     return result
 
 
@@ -62,9 +88,7 @@ def combine(qid, checks, state):
         return combine_playground(qid, checks, state)
     answer, reason, used = _combine(qid, checks, state)
     facts = state["facts"]
-    capacity_failure = (qid == "workplan_sufficient"
-                        and all(facts[key]["status"] == "PRESENT" for key in ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months"))
-                        and facts["requested_gpu_hours"]["value"] > facts["maximum_number_of_gpus"]["value"] * 24 * 30 * facts["project_duration_months"]["value"])
+    capacity_failure = qid == "workplan_sufficient" and resource_capacity(state)['severity'] == 'blocker'
     if (not capacity_failure and state["registry"]["version"] == "4.2" and answer == "NO" and qid != "code_previously_installed"
             and any(checks[key].get("confidence", 1) < state["policy"]["high_confidence"] for key in used)):
         return "UNKNOWN", "The negative evidence check is not strong enough for a reliable combined answer; verify its sources.", used
@@ -108,11 +132,10 @@ def _combine(qid, checks, state):
             return "NO", "Prior installation/use on LUMI is not demonstrated in the supplied evidence; this does not establish incompatibility.", ["prior_lumi_run"]
         return "UNKNOWN", "The evidence does not allow the prior installation status to be assessed reliably.", list(checks)
     facts = state["facts"]
-    keys = ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months")
+    keys = ("requested_gpu_hours", "project_duration_months")
     if not all(facts[key]["status"] == "PRESENT" for key in keys):
         return "UNKNOWN", "Resource amounts and duration need verification.", list(checks)
-    hours, gpus, months = (facts[key]["value"] for key in keys)
-    if hours > gpus * 24 * 30 * months:
+    if resource_capacity(state)["severity"] == "blocker":
         return "NO", "Requested GPU-hours exceed continuous maximum capacity within the project duration.", list(checks)
     if checks["execution_fits"]["status"] == "ACCOUNTING_ASSUMPTION_REVIEW":
         return "UNKNOWN", "The budget depends on MFU assumptions and GCD accounting; verify performance measurements and full-MI250X GPU-hour units.", ["execution_fits"]
@@ -123,7 +146,7 @@ def _combine(qid, checks, state):
     if state["registry"]["version"] in {"4.1", "4.2", "4.3", "4.4", "4.5", "4.6", "4.7"}:
         required.append("jobs_budgeted")
     if all(is_answer(key, "YES") for key in required):
-        return "YES", "Concrete targets, workload sizing and the execution assessment support feasibility; capacity arithmetic fits. Separate startup timing is not required.", required
+        return "YES", "Concrete targets, workload sizing and the execution assessment support feasibility; no established project-wide capacity limit is exceeded. Separate startup timing is not required.", required
     return "UNKNOWN", "Concrete targets or a credible execution plan still need clarification.", list(checks)
 
 
@@ -150,10 +173,9 @@ def combine_legacy(qid, checks, state):
         return "UNKNOWN", "Neither prior execution nor a sufficient standard environment is established.", list(checks)
     # Arithmetic is performed in Python, never delegated to the language model.
     facts = state["facts"]
-    keys = ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months")
+    keys = ("requested_gpu_hours", "project_duration_months")
     if all(facts[key]["status"] == "PRESENT" for key in keys):
-        hours, gpus, months = (facts[key]["value"] for key in keys)
-        if hours > gpus * 24 * 30 * months:
+        if resource_capacity(state)["severity"] == "blocker":
             return "NO", "Requested GPU-hours exceed continuous maximum capacity within the project duration.", list(checks)
     else:
         return "UNKNOWN", "Resource amounts and duration need verification.", list(checks)
@@ -161,7 +183,7 @@ def combine_legacy(qid, checks, state):
         if is_answer(key, "NO"):
             return "NO", "The workplan fails this evidence check: " + checks[key].get("check_title", key.replace("_", " ")), [key]
     if all(is_answer(key, "YES") for key in checks):
-        return "YES", "Goals, job budget, startup allowance and execution strategy support feasibility; capacity arithmetic fits.", list(checks)
+        return "YES", "Goals, job budget, startup allowance and execution strategy support feasibility; no established project-wide capacity limit is exceeded.", list(checks)
     return "UNKNOWN", "Resolve missing evidence about goals, job budgets, startup allowance or achievable targets.", list(checks)
 
 
@@ -171,13 +193,12 @@ def combine_playground(qid, checks, state):
     if qid == "code_previously_installed":
         return _combine(qid, checks, state)
     facts = state["facts"]
-    keys = ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months")
+    keys = ("requested_gpu_hours", "project_duration_months")
     if not all(facts[key]["status"] == "PRESENT" for key in keys):
         return "UNKNOWN", "Resource amounts and duration need verification.", list(checks)
-    hours, gpus, months = (facts[key]["value"] for key in keys)
-    if hours > gpus * 24 * 30 * months:
+    if resource_capacity(state)["severity"] == "blocker":
         return "NO", "Requested GPU-hours exceed continuous maximum capacity within the project duration.", list(checks)
     check = checks["onboarding_plan"]
     if check["status"] == "OK" and check["answer"] == "YES":
-        return "YES", "A concrete onboarding or exploratory task is described; capacity arithmetic fits. Playground does not require a detailed job budget or measured scaling.", ["onboarding_plan"]
+        return "YES", "A concrete onboarding or exploratory task is described; no established project-wide capacity limit is exceeded. Playground does not require a detailed job budget or measured scaling.", ["onboarding_plan"]
     return "NO" if check["answer"] == "NO" else "UNKNOWN", "The proposal does not demonstrate a concrete onboarding task or small experiment for this allocation.", ["onboarding_plan"]

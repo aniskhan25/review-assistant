@@ -13,7 +13,7 @@ Country: Finland
 VAT number: FI12345678
 Resources
 Requested GPU hours: 50000
-Maximum number of GPUs: 64
+Maximum total concurrent GPUs: 64
 Total storage (GB): 1000
 Total transfer (GB): 200
 Personal data declared: No

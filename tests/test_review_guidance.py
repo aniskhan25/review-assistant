@@ -30,7 +30,7 @@ def test_storage_threshold_warns_without_rejection(storage, warn):
 
 @pytest.mark.parametrize("gpus,multinode", [(4, False), (5, True)])
 def test_four_full_gpus_per_node(gpus, multinode):
-    state = review(TEXT.replace("Maximum number of GPUs: 64", f"Maximum number of GPUs: {gpus}"))
+    state = review(TEXT.replace("Maximum total concurrent GPUs: 64", f"Maximum total concurrent GPUs: {gpus}"))
     assert bool(findings(state, "multi_node")) == multinode
 
 

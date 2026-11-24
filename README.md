@@ -39,6 +39,7 @@ Open **http://127.0.0.1:8765** and unlock with `data/reviewer.key`.
 
 ## Details
 
+- [Optional generic wording with Aitta](deploy/aitta-local.md)
 - [Review workflow, assessment rules and API](docs/review-guide.md)
 - [Qwen setup and troubleshooting details](deploy/mlx-local.md)
 - [Offline deployment](deploy/README.md) · [Evaluation and tests](evaluation/README.md)

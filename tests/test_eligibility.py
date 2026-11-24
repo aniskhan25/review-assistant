@@ -1,4 +1,5 @@
 from datetime import date
+import pytest
 
 from app.eligibility import prefill, reference_current
 from app.readiness import decision_ready
@@ -23,7 +24,7 @@ def test_declared_category_and_member_country_are_prefills():
         assert decision_ready(state, qid, d)
 
 
-def test_large_enterprise_and_non_member_require_verification():
+def test_large_enterprise_and_country_outside_saved_reference_require_verification():
     state = configured()
     state['facts']['organization_type']['value'] = 'Large enterprise'
     state['facts']['country']['value'] = 'United Kingdom'
@@ -31,6 +32,28 @@ def test_large_enterprise_and_non_member_require_verification():
         d = prefill(state, qid, state['registry']['questions'][qid])
         assert d['answer'] == 'UNKNOWN' and d['status'] == 'MANUAL_REQUIRED'
         assert not decision_ready(state, qid, d)
+
+
+@pytest.mark.parametrize('mode', ['Fast Lane', 'Playground'])
+@pytest.mark.parametrize('country', ['United Kingdom', 'UK', 'U.K.', 'GB', 'GBR',
+                                    'United Kingdom of Great Britain and Northern Ireland',
+                                    'Albania', 'Iceland', 'Israel', 'Moldova', 'Montenegro',
+                                    'North Macedonia', 'Serbia', 'Switzerland', 'Türkiye', 'Turkey'])
+def test_current_reference_includes_uk_and_published_associated_countries(mode, country):
+    from tests.helpers import TEXT
+    state = review(TEXT.replace('Fast Lane', mode).replace('Country: Finland', 'Country: ' + country))
+    decision = state['decisions']['country_eligible']
+    assert decision['question_version'] == '1.3'
+    assert decision['answer'] == 'YES' and decision['status'] == 'SOURCE_RULE_MATCH'
+    assert decision['ready'] and decision['evidence_ids']
+    assert decision['reference']['checked'] == '2026-10-19'
+
+
+def test_country_outside_current_list_is_unresolved_not_rejected():
+    from tests.helpers import TEXT
+    state = review(TEXT.replace('Country: Finland', 'Country: Canada'))
+    decision = state['decisions']['country_eligible']
+    assert decision['answer'] == 'UNKNOWN' and not decision['ready']
 
 
 def test_reference_expiry_and_missing_source_block_auto_eligibility():
@@ -158,3 +181,49 @@ def test_saved_subset_does_not_silently_gain_norway():
     state['facts']['country']['value'] = 'Norway'
     q = state['registry']['questions']['country_eligible']
     assert prefill(state, 'country_eligible', q)['answer'] == 'UNKNOWN'
+
+
+@pytest.mark.parametrize('mode', ['Fast Lane', 'Playground'])
+@pytest.mark.parametrize('category', ['Self-employed', 'Sole proprietor', 'Sole trader',
+                                      'Self-employed consultant (project conducted for a startup in formation)'])
+def test_self_employed_business_with_source_backed_tax_id_is_eligible(mode, category):
+    from tests.helpers import TEXT
+    text = TEXT.replace('Fast Lane', mode).replace('Organization type: SME',
+            'Organization type: Other\nOther: specify the organization type:\n' + category)
+    state = review(text)
+    d = state['decisions']['organization_eligible']
+    assert d['answer'] == 'YES' and d['ready']
+    assert d['status'] == 'SOURCE_RULE_MATCH'
+    assert 'not been independently validated' in d['reference_reason']
+    from app.readiness import fact_evidence
+    assert set(fact_evidence(state, state['facts']['vat_number'])).issubset(d['evidence_ids'])
+    d['reference']['expires'] = '2020-01-01'
+    assert not decision_ready(state, 'organization_eligible', d)
+
+
+@pytest.mark.parametrize('tax', ['Not provided', 'None'])
+def test_self_employment_requires_tax_identifier_not_just_future_startup(tax):
+    from tests.helpers import TEXT
+    state = review(TEXT.replace('Organization type: SME', 'Organization type: Self-employed')
+                   .replace('VAT number: FI12345678', 'VAT number: ' + tax))
+    d = state['decisions']['organization_eligible']
+    assert d['answer'] == 'UNKNOWN' and not d['ready']
+
+
+@pytest.mark.parametrize('category', ['Individual', 'Startup in formation', 'Not self-employed',
+                                      'Unregistered individual planning self-employment'])
+def test_individual_or_future_business_does_not_match_self_employed_rule(category):
+    from tests.helpers import TEXT
+    state = review(TEXT.replace('Organization type: SME', 'Organization type: ' + category))
+    assert state['decisions']['organization_eligible']['answer'] == 'UNKNOWN'
+
+
+def test_self_employed_lead_cannot_borrow_team_members_tax_id():
+    from tests.helpers import TEXT
+    text = TEXT.replace('Organization type: SME', 'Organization type: Self-employed').replace(
+        'VAT number: FI12345678', 'VAT number: Not provided')
+    text += ('\nTeam Members #1\nOrganization type: SME\nVAT number: FI98765432\n'
+             'Code Details and Feasibility\nPyTorch ROCm experiments.')
+    state = review(text)
+    assert state['facts']['vat_number']['status'] == 'NOT_FOUND'
+    assert state['decisions']['organization_eligible']['answer'] == 'UNKNOWN'

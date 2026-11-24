@@ -1,5 +1,6 @@
 "use strict";
 let token = "", state = null, sessionEpoch = 0, pending = false, savingForm = null;
+let draftingConfig = {enabled: false};
 const drafts = new Map();
 function hasDrafts(exceptKey) { return [...drafts.keys()].some(key => key !== exceptKey); }
 function controlValue(control) { return control.multiple ? selected(control) : control.type === "checkbox" ? control.checked : control.value; }
@@ -24,7 +25,7 @@ function clearAcknowledgement() { const values = drafts.get("final"); if (values
 function updateControls() {
   document.querySelectorAll("button, input, select, textarea").forEach(control => {
     if (control.id === "lock") return;
-    control.disabled = pending || (control.dataset.export === "true" && hasDrafts()) || (control.dataset.approve === "true" && (hasDrafts("final") || !state?.draft_classification));
+    control.disabled = pending || (control.dataset.export === "true" && hasDrafts()) || (control.dataset.draft === "true" && (hasDrafts("final") || !state?.draft_classification)) || (control.dataset.approve === "true" && (hasDrafts("final") || !state?.draft_classification));
   });
   const approvalStatus = $("approval-status");
   if (approvalStatus) approvalStatus.textContent = hasDrafts("final") ? "Save your fact, answer, evidence, and extraction edits before approving." : !state?.draft_classification ? "Approval is unavailable until all exceptions are resolved and the access profile and target are supported." : "Ready for your final review. Choose a classification and tick the approval checkbox before approving.";
@@ -60,11 +61,15 @@ async function refreshLibraryAfterSave(epoch) {
 }
 async function mutate(action, data) {
   if (action === "finalize" && hasDrafts("final")) throw new Error("Save your fact, answer, and evidence edits before approving.");
+  const replacesWriting = ["draft-review", "standard-wording"].includes(action);
+  if (replacesWriting && hasDrafts("final")) throw new Error("Save your fact, answer, and evidence edits before drafting.");
+  if (replacesWriting && drafts.has("final") && !window.confirm("Replace unsaved assessment text?")) return;
   const id = state.id, epoch = sessionEpoch, key = savingForm;
   const result = await api(`/api/reviews/${id}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ revision: state.revision, ...data }) });
   if (epoch !== sessionEpoch || state?.id !== id) return;
   const detailState = [...$("review").querySelectorAll("details[id]")].map(node => [node.id, node.open]);
   if (key) drafts.delete(key);
+  if (replacesWriting) drafts.delete("final");
   clearAcknowledgement(); state = result; render();
   for (const [id, open] of detailState) if ($(id)) $(id).open = open;
   message("Saved locally."); await refreshLibraryAfterSave(epoch);
@@ -92,6 +97,7 @@ async function library() {
 }
 $("login").addEventListener("submit", event => { event.preventDefault(); run(event.submitter, async () => {
   const epoch = sessionEpoch; token = $("key").value.trim(); const config = await api("/api/config"); if (epoch !== sessionEpoch) return; $("key").value = "";
+  draftingConfig = config.drafting || {enabled: false};
   $("login").hidden = true; $("library").hidden = false; $("workspace").hidden = false; $("welcome").hidden = true;
   $("identity").textContent = `Reviewer: ${config.reviewer}`;
   $("runtime").textContent = `${config.policy.mode.toUpperCase()} · Backend: ${config.backend} · ${config.policy.approved ? "Approved policy" : "Provisional policy — validate before production"}`;
@@ -212,6 +218,52 @@ function render() {
   for (const f of state.rules.findings) { const row = el("div", undefined, "finding"); row.append(el("strong", f.severity), el("span", f.message)); if (f.source_ref) row.append(el("p", `Guidance: ${f.source_ref}`, "muted")); if (Object.keys(f.calculation).length) row.append(el("pre", JSON.stringify(f.calculation, null, 2))); rules.append(row); } root.append(rules);
   const final = el("section", undefined, "card"); final.id = "assessment"; final.tabIndex = -1; final.append(el("h2", "4. Confirm the final assessment"));
   final.append(el("p", "Review the draft and approve it once. Your approval includes the automatically prefilled facts and answers. Resolve highlighted exceptions first; you can edit any prefill.", "muted"));
+  if (draftingConfig.enabled) {
+    const writer = el("div", undefined, "card");
+    writer.append(el("p", `Optional Aitta wording · ${draftingConfig.model}`), el("p", "Only fixed assessment categories and locally composed generic wording leave this computer. Proposal text, project details, figures, identifiers and reviewer notes stay local. Preview the exact request before sending.", "muted"));
+    const defaults = state.writing_draft?.assessment || {};
+    const scaling = select(["NOT_ASSESSED", "PROVIDED", "NOT_PROVIDED", "NOT_REQUIRED"], defaults.scaling_results || "NOT_ASSESSED"); scaling.id = "aitta-scaling-results";
+    const execution = select(["NOT_SPECIFIED", "INDEPENDENT_JOBS", "DISTRIBUTED_JOB", "MIXED_EXECUTION"], defaults.execution_pattern || "NOT_SPECIFIED"); execution.id = "aitta-execution-pattern";
+    for (const option of [...scaling.options, ...execution.options]) option.textContent = option.value.toLowerCase().replaceAll("_", " ");
+    writer.append(label("Scaling results — generic reviewer category", scaling), label("Execution pattern — generic reviewer category", execution));
+    const previewButton = el("button", "Preview Aitta input", "secondary"); previewButton.id = "preview-aitta-review"; previewButton.dataset.draft = "true";
+    const previewBox = el("div"); previewBox.id = "aitta-preview";
+    let preview = null;
+    const invalidate = () => { preview = null; previewBox.replaceChildren(); };
+    scaling.addEventListener("change", invalidate); execution.addEventListener("change", invalidate);
+    previewButton.onclick = () => run(previewButton, async () => {
+      if (hasDrafts("final")) throw new Error("Save your fact, answer, and evidence edits before previewing.");
+      const id = state.id, epoch = sessionEpoch;
+      const assessment_options = {scaling_results: scaling.value, execution_pattern: execution.value};
+      const result = await api(`/api/reviews/${id}/preview-review`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({revision: state.revision, classification: classification.value, assessment_options})});
+      if (epoch !== sessionEpoch || state?.id !== id) return;
+      preview = {result, assessment_options, classification: classification.value};
+      previewBox.replaceChildren();
+      previewBox.append(el("p", "Generic assessment to send — no proposal content. Your access token is used separately for authentication.", "banner"), el("pre", JSON.stringify(result.assessment, null, 2)));
+      const fullRequest = el("details"); fullRequest.append(el("summary", "Exact request body, including fixed editing instructions"), el("pre", JSON.stringify(result.request, null, 2))); previewBox.append(fullRequest);
+      const generate = el("button", "Send preview and generate", "secondary"); generate.id = "generate-aitta-review"; generate.dataset.draft = "true";
+      generate.onclick = () => run(generate, async () => {
+        if (!preview || preview.classification !== classification.value) throw new Error("Preview the current assessment before sending.");
+        message("Revising generic wording with Aitta. Proposal content stays local.", "banner");
+        await mutate("draft-review", {classification: preview.classification, send_to_aitta: true, preview_hash: preview.result.preview_hash, assessment_options: preview.assessment_options});
+      });
+      previewBox.append(generate);
+      message("Preview ready. Nothing has been sent to Aitta.");
+    });
+    writer.append(previewButton, previewBox); final.append(writer);
+  }
+  if (state.writing_draft) {
+    const writing = state.writing_draft;
+    final.append(el("p", writing.stale ? "The Aitta draft is out of date. Regenerate or return to standard wording before approval." : `Drafted with Aitta · ${writing.model}. Review every claim and edit as needed.`, writing.stale ? "banner warning" : "muted"));
+    for (const issue of writing.issues || []) final.append(el("p", `Aitta flagged for review: ${issue}`, "warning"));
+    const provenance = el("details"); provenance.append(el("summary", "Draft basis — reviewer only"));
+    for (const [name, value] of Object.entries({...writing.comments, global_comment: writing.global_comment, rationale: writing.rationale})) {
+      provenance.append(el("p", `${name.replaceAll("_", " ")}: ${(value.assessment_fields || value.evidence_ids || []).join(", ")}`, "muted"));
+    }
+    final.append(provenance);
+    const standard = el("button", "Return to standard wording", "secondary"); standard.id = "standard-wording";
+    standard.onclick = () => run(standard, () => mutate("standard-wording", {})); final.append(standard);
+  }
   const approvalStatus = el("p", "", "banner"); approvalStatus.id = "approval-status"; final.append(approvalStatus);
   final.append(el("pre", state.draft || "Resolve exceptions to prepare the draft."));
   const f = el("form"), classification = select(["Choose classification", "ACCEPT", "REJECT"], state.final?.classification || state.draft_classification), rationale = noteBox(), ack = input("", "checkbox"); rationale.maxLength = 4000; rationale.value = state.final?.rationale || state.draft_rationale || ""; ack.checked = false;
@@ -231,7 +283,13 @@ function render() {
     cleanComments.onclick = () => { globalComment.value = globalComment.value.replace(internalWorkloadLine, "").trim(); globalComment.dispatchEvent(new Event("input")); ack.checked = false; ack.dispatchEvent(new Event("input")); message("Internal workload lines removed from editable comments. Review and approve to update the assessment."); };
     final.append(cleanComments);
   }
-  const approve = submit(f, state.policy.mode === "shadow" ? "Approve shadow assessment" : "Approve assessment", () => mutate("finalize", { classification: classification.value, rationale: rationale.value, acknowledge_findings: ack.checked, rejection_category: category.value, rejection_details: selected(rejectionDetails), global_comment: globalComment.value, exception_note: exception.value }), "final"); approve.dataset.approve = "true"; final.append(f);
+  const commentInputs = {};
+  const comments = state.final?.form_comments || state.draft_form_comments || {};
+  for (const [qid, value] of Object.entries(comments)) {
+    const box = noteBox(); box.value = value; commentInputs[qid] = box;
+    f.append(label(state.registry.questions[qid]?.title || qid, box));
+  }
+  const approve = submit(f, state.policy.mode === "shadow" ? "Approve shadow assessment" : "Approve assessment", () => mutate("finalize", { classification: classification.value, rationale: rationale.value, acknowledge_findings: ack.checked, rejection_category: category.value, rejection_details: selected(rejectionDetails), global_comment: globalComment.value, exception_note: exception.value, form_comments: Object.fromEntries(Object.entries(commentInputs).map(([qid, box]) => [qid, box.value])) }), "final"); approve.dataset.approve = "true"; final.append(f);
   for (const followUp of state.final?.follow_up || []) final.append(el("p", followUp, "banner warning"));
   if (state.final) { final.append(el("pre", state.final.text)); const download = el("button", "Download assessment", "secondary"); download.id = "download-assessment"; download.onclick = () => run(download, async () => { if (hasDrafts()) throw new Error("Save your edits before exporting."); const id = state.id, epoch = sessionEpoch; const text = await api(`/api/reviews/${id}/export`); if (epoch === sessionEpoch && state?.id === id) saveFile(text, `review-${id.slice(0, 8)}.txt`, "text/plain"); }); download.dataset.export = "true"; final.append(download); }
   root.append(final);

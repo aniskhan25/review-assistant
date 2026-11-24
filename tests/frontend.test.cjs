@@ -304,3 +304,57 @@ test('confirmed answers replace obsolete reviewer-required labels and unresolved
   assert.match(text,/YES · Confirmation needed/);
   assert.match(text,/Why confirmation is needed:.*70%/);
 });
+
+function setupAitta(h) {
+  h.run("draftingConfig = {enabled:true,model:'Qwen/Qwen3.8-27B'}"); load(h);
+  h.document.getElementById('edit-final-0').value='ACCEPT';
+  h.document.getElementById('aitta-scaling-results').value='NOT_ASSESSED';
+  h.document.getElementById('aitta-execution-pattern').value='NOT_SPECIFIED';
+}
+const safePreview = () => ({request:{model:'Qwen/Qwen3.8-27B',messages:[{role:'user',content:'Generic assessment only'}]},preview_hash:'approved-preview'});
+
+test('Aitta requires a visible request preview before sending and keeps generated text editable', async () => {
+  const h = harness(); setupAitta(h);
+  assert.equal(h.requests.length,0);
+  assert.equal(h.document.getElementById('generate-aitta-review'),null);
+  const next = fixture(); next.revision=2; next.draft_rationale='Generic revised reason'; next.draft_global_comment='Generic technical comment';
+  next.draft_form_comments={software_gpu_capable:'Revised architecture comment',code_previously_installed:'Revised prior use comment',workplan_sufficient:'Revised workplan comment'};
+  next.writing_draft={model:'Qwen/Qwen3.8-27B',stale:false,issues:[],comments:Object.fromEntries(Object.keys(next.draft_form_comments).map(k=>[k,{text:next.draft_form_comments[k],assessment_fields:['workplan'],evidence_ids:['e1']}])),global_comment:{assessment_fields:['workplan']},rationale:{assessment_fields:['workplan']}};
+  h.respond(url=>Promise.resolve(response(url.endsWith('/preview-review')?safePreview():url==='/api/reviews'?[]:next)));
+  await h.document.getElementById('preview-aitta-review').click();
+  assert.equal(h.requests.length,1);
+  assert.ok(h.document.getElementById('aitta-preview').textContent.includes('Generic assessment only'));
+  const previewBody=JSON.parse(h.requests[0][1].body);
+  assert.deepEqual(Object.keys(previewBody).sort(),['assessment_options','classification','revision']);
+  assert.equal(previewBody.send_to_aitta,undefined);
+  await h.document.getElementById('generate-aitta-review').click();
+  const body=JSON.parse(h.requests[1][1].body);
+  assert.equal(body.send_to_aitta,true);assert.equal(body.preview_hash,'approved-preview');
+  assert.equal(h.document.getElementById('edit-final-1').value,'Generic revised reason');
+  assert.equal(h.document.getElementById('edit-final-5').value,'Generic technical comment');
+  assert.equal(h.document.getElementById('edit-final-7').value,'Revised architecture comment');
+  assert.equal(h.document.getElementById('edit-final-2').checked,false);
+  assert.equal(h.run('state.final'),null);
+});
+
+test('Aitta never sends edited reviewer prose and preserves it after provider failure', async () => {
+  const h = harness();setupAitta(h);
+  edit(h,'edit-final-1','PRIVATE IDEA IN MY EDITED REASON');
+  h.respond(url=>Promise.resolve(response(url.endsWith('/preview-review')?safePreview():{error:'Aitta is busy'},url.endsWith('/preview-review')?200:400)));
+  await h.document.getElementById('preview-aitta-review').click();
+  await h.document.getElementById('generate-aitta-review').click();
+  assert.ok(!JSON.stringify(h.requests).includes('PRIVATE IDEA'));
+  assert.equal(h.document.getElementById('edit-final-1').value,'PRIVATE IDEA IN MY EDITED REASON');
+  assert.equal(h.run("drafts.has('final')"),true);
+  const s=fixture();s.draft_classification=null;load(h,s);
+  assert.equal(h.document.getElementById('preview-aitta-review').disabled,true);
+});
+
+test('changing a generic option invalidates the preview without sending', async () => {
+  const h=harness();setupAitta(h);h.respond(()=>Promise.resolve(response(safePreview())));
+  await h.document.getElementById('preview-aitta-review').click();
+  assert.ok(h.document.getElementById('generate-aitta-review'));
+  const scaling=h.document.getElementById('aitta-scaling-results');scaling.value='PROVIDED';scaling.dispatchEvent({type:'change'});
+  assert.equal(h.document.getElementById('generate-aitta-review'),null);
+  assert.equal(h.requests.length,1);
+});

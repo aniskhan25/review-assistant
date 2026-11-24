@@ -34,6 +34,8 @@ def main():
     parser.add_argument("--runtime-dir", type=Path, default=Path("models/decision-4b"))
     parser.add_argument("--data-dir", default="data")
     parser.add_argument("--port", type=int, default=8766)
+    parser.add_argument('--aitta-drafting', action='store_true')
+    parser.add_argument('--aitta-model', default='Qwen/Qwen3.8-27B')
     args = parser.parse_args()
     try:
         version = model_fingerprint(args.runtime_dir)
@@ -42,6 +44,8 @@ def main():
     command = [sys.executable, "-m", "app.server", "--reviewer", args.reviewer,
                "--backend", "mlx", "--model-path", str((args.runtime_dir / "model").resolve()),
                "--model-version", version, "--data-dir", args.data_dir, "--port", str(args.port)]
+    if args.aitta_drafting:
+        command += ['--aitta-drafting', '--aitta-model', args.aitta_model]
     try:
         raise SystemExit(subprocess.call(command))
     except KeyboardInterrupt:

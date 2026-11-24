@@ -13,7 +13,7 @@ FIELDS = {
     "country": ("text", ["country", "country - horizon 2020", "organization country", "organisation country", "organization country - horizon 2020", "organisation country - horizon 2020"]),
     "vat_number": ("text", ["vat number", "vat", "organization vat number", "organisation vat number", "company vat number", "company tax number"]),
     "requested_gpu_hours": ("positive", ["requested amount of resources (gpu hours)", "requested gpu hours", "gpu hours"]),
-    "maximum_number_of_gpus": ("integer", ["maximum number of gpus", "maximum gpus"]),
+    "maximum_number_of_gpus": ("integer", ["maximum number of gpus", "maximum gpus", "maximum total concurrent gpus", "maximum concurrent gpus across all jobs", "maximum total gpus across all jobs"]),
     "total_storage_gb": ("nonnegative", ["total storage (gb)", "total storage gb", "total storage", "total storage required (gb)"]),
     "total_transfer_gb": ("nonnegative", ["total transfer (gb)", "total transfer gb", "total transfer", "total amount of data to transfer to/from (gb)"]),
     "listed_codes": ("text", ["code(s) used", "listed codes", "software codes"]),
@@ -196,12 +196,19 @@ def extract_facts(doc):
                     detail["source"]["declared_category"] = "Other"
         if not matches:
             matches = list(supplemental_matches(field, [r for r in regions if r["scope"] == "proposal"]))
-        if not matches:
+        resolved_matches = matches
+        if field == "access_mode":
+            # The accepted submission policy identifies the current call. Narrative
+            # mentions can describe earlier projects outside allocation-history fields.
+            policies = [m for m in matches if m["source"]["method"] == "accepted_submission_policy"]
+            if policies:
+                resolved_matches = policies
+        if not resolved_matches:
             fact = {"value": None, "status": "PARSE_ERROR" if doc["warnings"] else "NOT_FOUND", "source": None}
-        elif any(m["value"] != matches[0]["value"] or m["status"] != matches[0]["status"] for m in matches):
+        elif any(m["value"] != resolved_matches[0]["value"] or m["status"] != resolved_matches[0]["status"] for m in resolved_matches):
             fact = {"value": None, "status": "CONFLICT", "source": None}
         else:
-            fact = matches[0].copy()
+            fact = resolved_matches[0].copy()
         fact.update({"candidates": matches, "confirmed": False})
         if field in PARTITION_FIELDS:
             fact["optional_resource_field"] = True

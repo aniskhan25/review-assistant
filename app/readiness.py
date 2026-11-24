@@ -21,7 +21,8 @@ def decision_ready(state, qid, decision):
         return decision.get("reviewer_answer") in {"YES", "NO"}
     question = state["registry"]["questions"][qid]
     source_rule = decision.get("inference_mode") == "source_rule" and decision["status"] == "SOURCE_RULE_MATCH"
-    if source_rule and (qid == "country_eligible" or question.get("organization_reference")):
+    if source_rule and (qid == "country_eligible" or question.get("organization_reference")
+                        or decision.get("reference", {}).get("expires")):
         from app.eligibility import reference_current
         if not reference_current(decision.get("reference", {})):
             return False

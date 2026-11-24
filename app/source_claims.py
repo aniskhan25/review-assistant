@@ -62,6 +62,8 @@ def source_claim(question, evidence):
                     'quotes': [quote for _, quote in matches]}
     if question.get('quantity_evidence'):
         for ev in evidence:
+            if ev.get('scope') == 'allocation_history':
+                continue  # Past runs inform the model, not literal current quantities.
             for line in ev['text'].splitlines():
                 if QUANTITY.search(line) and ACTION.search(line) and not OUTSIDE_SCOPE.search(line):
                     matches.append((ev, line.strip()))

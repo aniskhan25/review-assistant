@@ -142,6 +142,19 @@ def test_opposite_prior_use_interpretations_remain_unresolved():
     assert result['probabilities'] == primary['probabilities'] and primary['answer'] == 'NO'
 
 
+def test_positive_prior_use_needs_resolved_corroboration_including_playground():
+    from app.semantic_checks import resolve_corroboration
+    from app.configuration import review_registry
+    assert 'corroborating_question' in review_registry('PLAYGROUND')['questions']['code_previously_installed']['checks']['prior_lumi_run']
+    primary = dict(status='OK', answer='YES', latency_ms=5, band='high')
+    for status in ('LOW_CONFIDENCE', 'MODEL_ERROR', 'NO_EVIDENCE_FOUND'):
+        secondary = dict(status=status, answer='UNKNOWN', latency_ms=7)
+        result = resolve_corroboration(primary, secondary)
+        assert result['answer'] == 'UNKNOWN'
+        assert result['status'] == 'CHECKS_UNRESOLVED'
+        assert primary['answer'] == 'YES'
+
+
 def test_registry_42_does_not_override_with_weak_negative_check():
     state = review();state['registry']['version'] = '4.2'
     c = checks(compatibility_blocker='YES')

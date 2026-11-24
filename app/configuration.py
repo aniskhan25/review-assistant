@@ -40,7 +40,6 @@ def review_registry(mode):
     registry["questions"] = {key: value for key, value in questions.items()
                              if key not in {"scaling_strategy_adequate", "official_rocm_builds_available", "fast_lane_validated"}}
     registry["questions"]["software_gpu_capable"]["checks"].pop("compatibility_blocker")
-    registry["questions"]["code_previously_installed"]["checks"]["prior_lumi_run"].pop("corroborating_question", None)
     for key, override in load_config("playground.json").items():
         registry["questions"][key].update(override)
     return registry

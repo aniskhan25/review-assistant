@@ -2,6 +2,7 @@
 
 
 from app.readiness import decision_ready
+from app.capacity import resource_capacity
 
 def evaluate(state, policy):
     findings = []
@@ -22,17 +23,9 @@ def evaluate(state, policy):
         add("target_machine", "attention", "Verify that the target is LUMI-G.")
     if not policy["approved"]:
         add("provisional_policy", "attention", "Policy is provisional; outputs are shadow drafts.")
-    hours, gpus, months = (value(k) for k in ("requested_gpu_hours", "maximum_number_of_gpus", "project_duration_months"))
-    if all(v is not None and v > 0 for v in (hours, gpus, months)):
-        minimum = hours / (gpus * 24 * 30)
-        calculation = {"requested_gpu_hours": hours, "maximum_number_of_gpus": gpus,
-                       "project_duration_months": months, "minimum_months": minimum,
-                       "assumption": "30-day months, continuous maximum concurrency; consistent GPU accounting units"}
-        add("resource_consumption", "blocker" if minimum > months else "info",
-            "Allocation cannot be consumed within the declared duration." if minimum > months else
-            "Allocation fits the theoretical maximum capacity; queue availability is not guaranteed.", calculation)
-    else:
-        add("resource_consumption", "attention", "Resource feasibility needs valid GPU hours, GPU count and duration.")
+    gpus = value("maximum_number_of_gpus")
+    capacity = resource_capacity(state)
+    add(capacity['code'], capacity['severity'], capacity['message'], capacity['calculation'])
     threshold = policy["storage_warning_gb"]
     if threshold is None or value("total_storage_gb") is None:
         add("storage", "attention", "Verify storage and configure the approved storage threshold.")

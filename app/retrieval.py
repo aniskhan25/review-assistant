@@ -48,4 +48,12 @@ def retrieve(evidence, question, limit=5):
         if score or section_match:
             ranked.append((score + 1.5 * section_match, ev))
     ranked.sort(key=lambda item: (-item[0], item[1]["id"]))
-    return [dict(ev, retrieval_score=round(score, 4)) for score, ev in ranked[:limit]]
+    selected = ranked[:limit]
+    if question.get('retain_previous_allocations') and 'previous' in question['sections'] and limit > 1:
+        # History can justify a continuation, but lexical ranking often pushes its
+        # identifiers and usage figures below generic current-software paragraphs.
+        history = [item for item in ranked if item[1].get('scope') == 'allocation_history'][:min(2, limit - 1)]
+        reserved = {ev['id'] for _, ev in history}
+        selected = [item for item in ranked if item[1]['id'] not in reserved][:limit - len(history)] + history
+        selected.sort(key=lambda item: (-item[0], item[1]['id']))
+    return [dict(ev, retrieval_score=round(score, 4)) for score, ev in selected]

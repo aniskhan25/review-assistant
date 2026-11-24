@@ -49,7 +49,7 @@ def test_extraction_conflict_and_missing_are_not_absence():
 
 
 def test_numeric_units_and_multiline_fields():
-    facts = extract_facts(document([{"page": 1, "text": "Requested GPU hours\n50,000 GPU hours\nMaximum number of GPUs: 64\nProject duration: 2 months"}]))
+    facts = extract_facts(document([{"page": 1, "text": "Requested GPU hours\n50,000 GPU hours\nMaximum total concurrent GPUs: 64\nProject duration: 2 months"}]))
     assert facts["requested_gpu_hours"]["value"] == 50000
     assert facts["project_duration_months"]["value"] == 2
     with pytest.raises(ValueError):

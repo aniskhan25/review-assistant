@@ -83,12 +83,17 @@ class Store:
                   "final_classification": state["final"]["classification"] if state["final"] else None,
                   "final_rationale": state["final"]["rationale"] if state["final"] else None}
         if state["final"]:
+            record['drafting'] = state['final'].get('drafting')
             record["rejection_category"] = state["final"].get("rejection_category")
             record["exception_note"] = state["final"].get("exception_note")
             record["automatic_facts"] = state["final"].get("automatic_facts", [])
             record["automatic_decisions"] = state["final"].get("automatic_decisions", [])
             record["approval_scope"] = state["final"].get("approval_scope")
             record["templates_hash"] = state["final"].get("templates_hash")
+        if state.get('writing_draft'):
+            record['writing_draft'] = {key: state['writing_draft'].get(key) for key in
+                ('provider', 'model', 'prompt_version', 'privacy_version', 'outbound_preview_hash',
+                 'assessment', 'input_hash', 'generated_at', 'classification', 'issues')}
         db.execute("INSERT INTO audit(review_id, created, record) VALUES (?, ?, ?)",
                    (state["id"], time.time(), json.dumps(record)))
 

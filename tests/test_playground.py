@@ -101,7 +101,7 @@ def test_empty_retrieval_records_search_scope_without_inventing_model_scores():
 
 
 def test_no_plan_omits_capacity_estimate_and_keeps_direct_reasons():
-    text = missing_text().replace('Maximum number of GPUs: 64', 'Maximum number of GPUs: 500000')
+    text = missing_text().replace('Maximum total concurrent GPUs: 64', 'Maximum total concurrent GPUs: 500000')
     state = playground(NoSupport(), text)
     assert not any(state['exceptions'].values())
     assert '0.000' not in state['draft']

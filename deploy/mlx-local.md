@@ -48,4 +48,4 @@ Saved reviews retain their original registry; upload again for current extractio
 or re-run suggestions to use the selected model with the saved review's criteria.
 Re-running clears previous model-answer confirmations. Clear high-confidence installation
 NO answers can be prefilled as setup warnings; clear negative technical answers can also be prefilled. Uncertain answers require
-review. Clear organisation categories and countries in the verified subset (EU members and Norway) can be prefilled from source-backed rules; uncertain and uncovered eligibility conditions remain manual. Final approval remains explicit.
+review. Clear organisation categories and countries in the verified LUMI AI Factory list (including the United Kingdom) can be prefilled from source-backed rules; uncertain and uncovered eligibility conditions remain manual. Final approval remains explicit.

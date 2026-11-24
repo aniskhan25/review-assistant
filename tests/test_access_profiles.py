@@ -61,6 +61,38 @@ def test_unaccepted_link_does_not_supply_mode():
     assert extract_facts(doc)["access_mode"]["status"] == "NOT_FOUND"
 
 
+def test_current_accepted_policy_outweighs_narrative_previous_project():
+    doc = document([
+        {"page": 1, "text": "Project summary\nThis Fast Lane project will train a new model."},
+        {"page": 4, "text": "Scalability and performance\nThe stack was proven on LUMI-G "
+         "in our Playground project using the LUMI AI Factory container."},
+        {"page": 7, "text": policy_text("fast-lane-access-ai-factories_en")},
+    ])
+    fact = extract_facts(doc)["access_mode"]
+    assert fact["status"] == "PRESENT"
+    assert fact["value"] == "FAST_LANE"
+    assert fact["source"]["method"] == "accepted_submission_policy"
+    assert fact["source"]["page"] == 7
+    assert any(c["value"] == "PLAYGROUND" for c in fact["candidates"])
+
+
+def test_conflicting_accepted_policies_still_require_review():
+    doc = document([{"page": 1, "text": policy_text("fast-lane-access-ai-factories_en")},
+                    {"page": 2, "text": policy_text("playground-access-ai-factories_en")}])
+    assert extract_facts(doc)["access_mode"]["status"] == "CONFLICT"
+
+
+def test_explicit_access_fields_conflict_even_with_accepted_policy():
+    doc = document([{"page": 1, "text": "Access mode: Fast Lane\nAccess mode: Playground\n"
+                     + policy_text("fast-lane-access-ai-factories_en")}])
+    assert extract_facts(doc)["access_mode"]["status"] == "CONFLICT"
+
+
+def test_narrative_conflict_without_accepted_policy_still_requires_review():
+    doc = document([{"page": 1, "text": "This Fast Lane project builds on our Playground project."}])
+    assert extract_facts(doc)["access_mode"]["status"] == "CONFLICT"
+
+
 def test_partition_units_and_wrapped_code_list():
     doc = document([{"page": 1, "text": "Partitions\nPartition name:\nLUMI-G\n"
         "Requested amount of resources (node hours): 1200\nCode(s) used: Example scientific pipeline,\n"
@@ -103,7 +135,7 @@ def test_unsupported_profile_never_invokes_fast_lane_model_or_rules(mode):
             pytest.fail("Fast Lane backend must not be called")
 
     doc = document([{"page": 1, "text": f"Access mode: {mode}\nTarget machine: LUMI-G\n"
-                     "Requested GPU hours: 999999\nMaximum number of GPUs: 1\nProject duration: 1\n"
+                     "Requested GPU hours: 999999\nMaximum total concurrent GPUs: 1\nProject duration: 1\n"
                      "Code details and feasibility\nPyTorch supports ROCm GPU jobs."}])
     state = new_review(doc, ForbiddenBackend(), load_policy(), "synthetic-reviewer")
     assert state["rules"]["suggested"] == "REVIEW_REQUIRED"

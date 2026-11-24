@@ -20,7 +20,7 @@ from app.storage import Store, ConflictError
 STATIC = Path(__file__).parent / "static"
 
 
-def create_server(store, backend, policy, token, reviewer, port=8765):
+def create_server(store, backend, policy, token, reviewer, port=8765, writer=None):
     request_lock = threading.Lock()
 
     class ReviewServer(ThreadingHTTPServer):
@@ -112,7 +112,9 @@ def create_server(store, backend, policy, token, reviewer, port=8765):
                 return self.send(200, (STATIC / name).read_bytes(), kind)
             if self.command == "GET" and path == "/api/config":
                 return self.send(200, {"policy": policy, "backend": backend.name, "reviewer": reviewer,
-                                      "questions": load_config("questions.json")})
+                                      "questions": load_config("questions.json"),
+                                      "drafting": {"enabled": writer is not None, "model": writer.model if writer else None,
+                                                   "privacy_version": writer.privacy_version if writer else None}})
             if self.command == "GET" and path == "/api/reviews":
                 return self.send(200, store.list(reviewer))
             if self.command == "POST" and path == "/api/reviews":
@@ -173,10 +175,33 @@ def create_server(store, backend, policy, token, reviewer, port=8765):
                 refresh(state)
             elif action == "analyze":
                 analyze(state, backend)
+            elif action == 'preview-review':
+                if writer is None:
+                    raise ValueError('Aitta drafting is not enabled on this server.')
+                if set(payload) - {'revision', 'classification', 'assessment_options'}:
+                    raise ValueError('Preview accepts fixed assessment categories only.')
+                if payload.get('classification') != state['draft_classification']:
+                    raise ValueError('Resolve reviewed answers and use the suggested classification before drafting.')
+                return self.send(200, writer.preview(state, payload['classification'], payload.get('assessment_options')))
+            elif action == 'draft-review':
+                if writer is None:
+                    raise ValueError('Aitta drafting is not enabled on this server.')
+                if payload.get('send_to_aitta') is not True:
+                    raise ValueError('Preview and confirm sending only the minimal assessment to Aitta.')
+                if set(payload) - {'revision', 'classification', 'send_to_aitta', 'preview_hash', 'assessment_options'}:
+                    raise ValueError('Drafting accepts fixed assessment categories only.')
+                if payload.get('classification') != state['draft_classification']:
+                    raise ValueError('Resolve reviewed answers and use the suggested classification before drafting.')
+                result = writer.generate(state, payload['classification'], payload.get('preview_hash'), payload.get('assessment_options'))
+                state['writing_draft'] = result
+                refresh(state)
+            elif action == 'standard-wording':
+                state.pop('writing_draft', None)
+                refresh(state)
             elif action == "finalize":
                 finalize(state, payload["classification"], payload["rationale"], payload.get("acknowledge_findings"),
                          payload.get("rejection_category", "NOT_FEASIBLE"), payload.get("global_comment", ""),
-                         payload.get("rejection_details"), payload.get("exception_note", ""))
+                         payload.get("rejection_details"), payload.get("exception_note", ""), payload.get('form_comments'))
             else:
                 return self.send(404, {"error": "Unknown action"})
             store.save(state, revision, action)
@@ -196,6 +221,8 @@ def main():
     parser.add_argument("--model-path")
     parser.add_argument("--model-version")
     parser.add_argument("--purge-only", action="store_true")
+    parser.add_argument('--aitta-drafting', action='store_true', help='Enable explicit online review drafting with Aitta')
+    parser.add_argument('--aitta-model', default='Qwen/Qwen3.8-27B')
     args = parser.parse_args()
     os.umask(0o077)
     install_network_guard()
@@ -215,7 +242,14 @@ def main():
     token = key_path.read_text().strip()
     if len(token) < 32:
         raise ValueError("Reviewer key must contain at least 32 characters")
-    server = create_server(store, backend, policy, token, args.reviewer, args.port)
+    writer = None
+    if args.aitta_drafting:
+        from app.aitta import AittaWriter
+        try:
+            writer = AittaWriter.from_environment(args.data_dir, args.aitta_model)
+        except ValueError as exc:
+            parser.error(str(exc))
+    server = create_server(store, backend, policy, token, args.reviewer, args.port, writer=writer)
     print(f"Open http://127.0.0.1:{server.server_port}; reviewer key: {key_path.resolve()}", flush=True)
     try:
         server.serve_forever()

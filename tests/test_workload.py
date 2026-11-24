@@ -122,7 +122,7 @@ def test_positive_findings_offer_acceptance_wording_and_failures_offer_none():
 
 
 def test_capacity_reason_in_email_contains_numbers_and_assumptions():
-    state = confirmed(review(TEXT.replace('50000', '12000').replace('Maximum number of GPUs: 64', 'Maximum number of GPUs: 8')))
+    state = confirmed(review(TEXT.replace('50000', '12000').replace('Maximum total concurrent GPUs: 64', 'Maximum total concurrent GPUs: 8')))
     prepare_review(state)
     assert state['draft_classification'] == 'REJECT'
     assert '12,000 GPU-hours' in state['draft_rationale']
@@ -132,7 +132,7 @@ def test_capacity_reason_in_email_contains_numbers_and_assumptions():
 
 
 def test_matching_findings_default_into_reason_without_duplicate_blocker_wording():
-    state = confirmed(review(TEXT.replace('50000', '12000').replace('Maximum number of GPUs: 64', 'Maximum number of GPUs: 8')))
+    state = confirmed(review(TEXT.replace('50000', '12000').replace('Maximum total concurrent GPUs: 64', 'Maximum total concurrent GPUs: 8')))
     for key in ('workplan_sufficient', 'official_rocm_builds_available'):
         state['decisions'][key]['reviewer_answer'] = 'NO'
     state['workload'] = assess_workload(state, Scores('NO'), '')
